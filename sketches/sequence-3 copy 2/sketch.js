@@ -13,12 +13,24 @@ const minHairLength = 50;
 const minHairSpacing = 8; // Minimum distance between hair roots
 const hairPaths = [];
 
-// Interactive circle parameters
-const circle = {
+// Interactive rectangle parameters (center-based)
+const rect = {
+  w: 110,
+  h: 15,
+  isHovered: false,
+  isDragging: false,
+  offsetX: 0,
+  offsetY: 0,
+};
+
+// Razor position (the draggable element)
+const razor = {
   x: 0,
   y: 0,
-  radius: 80,
-  isHovered: false,
+  targetX: 0,
+  targetY: 0,
+  width: 0,
+  height: 0,
 };
 
 // load threeSVG as image
@@ -38,6 +50,18 @@ threeMaskSVG.onload = () => {
   checkIfReady();
 };
 
+// load razorSVG as image
+const razorSVG = new Image();
+razorSVG.src = "/Assets/SVG/razor.svg";
+let razorLoaded = false;
+
+razorSVG.onload = () => {
+  razorLoaded = true;
+  razor.width = razorSVG.naturalWidth;
+  razor.height = razorSVG.naturalHeight;
+  checkIfReady();
+};
+
 // load legSVG as image
 const legSVG = new Image();
 legSVG.height = canvas.height;
@@ -52,10 +76,10 @@ legSVG.onload = () => {
 };
 
 function checkIfReady() {
-  if (svgLoaded && maskLoaded) {
+  if (svgLoaded && maskLoaded && razorLoaded) {
     createisPointInLegFunction();
     createIsPointInThreeFunction();
-    initCircle();
+    initRect();
     generateRandomHair(hairNumber);
     console.log("Hairs generated:", hairPaths.length);
     run(update);
@@ -104,7 +128,7 @@ function createIsPointInThreeFunction() {
 window.addEventListener("resize", () => {
   // If your engine resizes canvas elsewhere, ensure canvas dimensions are updated first.
   updateThreeMaskLayout();
-  initCircle();
+  initRect();
 });
 
 function createisPointInLegFunction() {
@@ -204,9 +228,11 @@ function generateRandomHair(numOfHair) {
   }
 }
 
-function initCircle() {
-  circle.x = canvas.width * 0.85;
-  circle.y = canvas.height * 0.5;
+function initRect() {
+  razor.x = canvas.width * 0.85;
+  razor.y = canvas.height * 0.5;
+  razor.targetX = razor.x;
+  razor.targetY = razor.y;
 }
 
 function update(dt) {
@@ -216,11 +242,42 @@ function update(dt) {
   ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
   drawThreeMaskDebug(); //DEBUG
 
-  // Check if mouse is hovering over circle
+  // Check if mouse is hovering over razor (bounds check)
   const mouseX = input.getX();
   const mouseY = input.getY();
-  const distToCircle = math.dist(mouseX, mouseY, circle.x, circle.y);
-  circle.isHovered = distToCircle < circle.radius;
+  rect.isHovered =
+    mouseX >= razor.x - razor.width / 2 &&
+    mouseX <= razor.x + razor.width / 2 &&
+    mouseY >= razor.y &&
+    mouseY <= razor.y + razor.height;
+
+  // Handle dragging
+  if (input.isPressed()) {
+    if (!rect.isDragging && rect.isHovered) {
+      rect.isDragging = true;
+      rect.offsetX = razor.x - mouseX;
+      rect.offsetY = razor.y - mouseY;
+    }
+    if (rect.isDragging) {
+      razor.x = mouseX + rect.offsetX;
+      razor.y = mouseY + rect.offsetY;
+    }
+  } else {
+    if (rect.isDragging) {
+      rect.isDragging = false;
+    }
+  }
+
+  // Animate back to target when not dragging using smooth lerp
+  if (!rect.isDragging) {
+    const ease = 0.08;
+    razor.x += (razor.targetX - razor.x) * ease;
+    razor.y += (razor.targetY - razor.y) * ease;
+  }
+
+  // Rectangle follows razor position
+  const rectX = razor.x;
+  const rectY = razor.y + rect.h / 2 + 10;
 
   ctx.lineWidth = 5;
   ctx.strokeStyle = "black";
@@ -252,14 +309,35 @@ function update(dt) {
     }
   });
 
-  // Draw interactive circle
+  // Draw interactive rectangle (debug) - follows razor
   ctx.beginPath();
-  ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
-  ctx.fillStyle = circle.isHovered ? "#333" : "#666";
+  ctx.rect(rectX - rect.w / 2, rectY - rect.h / 2, rect.w, rect.h);
+  ctx.fillStyle = rect.isDragging
+    ? "rgba(34,34,34,0.3)"
+    : rect.isHovered
+    ? "rgba(51,51,51,0.3)"
+    : "rgba(102,102,102,0.3)";
   ctx.fill();
-  ctx.strokeStyle = circle.isHovered ? "white" : "#999";
+  ctx.strokeStyle = rect.isDragging
+    ? "yellow"
+    : rect.isHovered
+    ? "white"
+    : "#999";
   ctx.lineWidth = 3;
   ctx.stroke();
+
+  // Draw razor SVG at its position
+  if (razorLoaded) {
+    ctx.save();
+    ctx.drawImage(
+      razorSVG,
+      razor.x - razor.width / 2,
+      razor.y,
+      razor.width,
+      razor.height
+    );
+    ctx.restore();
+  }
 }
 
 /* ------------------- DEBUG ----------------*/
