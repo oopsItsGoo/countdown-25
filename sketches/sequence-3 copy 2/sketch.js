@@ -13,8 +13,16 @@ const minHairLength = 50;
 const minHairSpacing = 8; // Minimum distance between hair roots
 const hairPaths = [];
 
+// Interactive circle parameters
+const circle = {
+  x: 0,
+  y: 0,
+  radius: 80,
+  isHovered: false,
+};
+
 // load threeSVG as image
-let threeMaskScale = 0.35; // This will now be relative to canvas height like the leg
+let threeMaskScale = 0.5; // This will now be relative to canvas height like the leg
 let threeMaskAspect;
 let threeMaskXFrac = 0.5;
 let threeMaskYFrac = 0.5;
@@ -47,6 +55,7 @@ function checkIfReady() {
   if (svgLoaded && maskLoaded) {
     createisPointInLegFunction();
     createIsPointInThreeFunction();
+    initCircle();
     generateRandomHair(hairNumber);
     console.log("Hairs generated:", hairPaths.length);
     run(update);
@@ -95,6 +104,7 @@ function createIsPointInThreeFunction() {
 window.addEventListener("resize", () => {
   // If your engine resizes canvas elsewhere, ensure canvas dimensions are updated first.
   updateThreeMaskLayout();
+  initCircle();
 });
 
 function createisPointInLegFunction() {
@@ -158,7 +168,12 @@ function generateRandomHair(numOfHair) {
     if (created >= numOfHair) break;
     const randomHairLength =
       Math.random() * (maxHairLength - minHairLength) + minHairLength;
-    const angle = Math.random() * Math.PI * 0.33 + Math.PI * 0.33;
+
+    // Randomly choose up or down direction
+    const baseAngle = Math.random() * Math.PI * 0.33 + Math.PI * 0.33;
+    const pointUp = Math.random() < 0.5;
+    const angle = pointUp ? -baseAngle : baseAngle;
+
     const x1 = Math.random() * canvas.width;
     const y1 = Math.random() * canvas.height;
 
@@ -189,6 +204,11 @@ function generateRandomHair(numOfHair) {
   }
 }
 
+function initCircle() {
+  circle.x = canvas.width * 0.85;
+  circle.y = canvas.height * 0.5;
+}
+
 function update(dt) {
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -196,12 +216,24 @@ function update(dt) {
   ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
   drawThreeMaskDebug(); //DEBUG
 
+  // Check if mouse is hovering over circle
+  const mouseX = input.getX();
+  const mouseY = input.getY();
+  const distToCircle = math.dist(mouseX, mouseY, circle.x, circle.y);
+  circle.isHovered = distToCircle < circle.radius;
+
   ctx.lineWidth = 5;
   ctx.strokeStyle = "black";
 
   hairPaths.forEach((e) => {
-    if (window.isPointInThree && window.isPointInThree(e.x1, e.y1)) {
-      if (math.dist(e.x1, e.y1, input.getX(), input.getY()) < 30) {
+    if (
+      window.isPointInThree &&
+      (window.isPointInThree(e.x1, e.y1) || window.isPointInThree(e.x2, e.y2))
+    ) {
+      if (
+        math.dist(e.x1, e.y1, input.getX(), input.getY()) < 30 ||
+        math.dist(e.x2, e.y2, input.getX(), input.getY()) < 30
+      ) {
         e.isCut = true;
       }
     }
@@ -219,6 +251,15 @@ function update(dt) {
       ctx.stroke();
     }
   });
+
+  // Draw interactive circle
+  ctx.beginPath();
+  ctx.arc(circle.x, circle.y, circle.radius, 0, 2 * Math.PI);
+  ctx.fillStyle = circle.isHovered ? "#333" : "#666";
+  ctx.fill();
+  ctx.strokeStyle = circle.isHovered ? "white" : "#999";
+  ctx.lineWidth = 3;
+  ctx.stroke();
 }
 
 /* ------------------- DEBUG ----------------*/
