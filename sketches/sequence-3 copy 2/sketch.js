@@ -6,23 +6,24 @@ const { ctx, canvas } = renderer;
 
 /* ------------- SETUP ------------- */
 // Hair parameters
-const hairNumber = 3000;
+const hairNumber = 4000;
 const maxAttempts = 20000;
-const maxHairLength = 50;
-const minHairLength = 30;
+const maxHairLength = 80;
+const minHairLength = 50;
+const minHairSpacing = 8; // Minimum distance between hair roots
 const hairPaths = [];
 
 // load threeSVG as image
-let threeMaskScale = 0.35;
+let threeMaskScale = 0.35; // This will now be relative to canvas height like the leg
 let threeMaskAspect;
-let threeMaskXFrac = 0.55;
-let threeMaskYFrac = 0.15;
+let threeMaskXFrac = 0.5;
+let threeMaskYFrac = 0.5;
 let threeMaskRect = { x: 0, y: 0, w: 0, h: 0 };
 
 const threeMaskSVG = new Image();
 threeMaskSVG.src = "/Assets/SVG/3-mask.svg";
 let maskLoaded = false;
-let showMaskDebug = true; //DEBUG
+let showMaskDebug = false; //DEBUG
 
 threeMaskSVG.onload = () => {
   maskLoaded = true;
@@ -54,10 +55,11 @@ function checkIfReady() {
 
 // Rebuild when canvas size or scale changes
 function updateThreeMaskLayout() {
-  const w = canvas.width * threeMaskScale;
-  const h = w / threeMaskAspect;
+  // Calculate height relative to canvas (same scaling approach as leg)
+  const h = canvas.height * threeMaskScale;
+  const w = h * threeMaskAspect;
   const x = canvas.width * threeMaskXFrac - w * 0.5;
-  const y = canvas.height * threeMaskYFrac; // top aligned
+  const y = canvas.height * threeMaskYFrac - h * 0.5;
   threeMaskRect.x = x;
   threeMaskRect.y = y;
   threeMaskRect.w = w;
@@ -119,6 +121,38 @@ function createisPointInLegFunction() {
 function generateRandomHair(numOfHair) {
   hairPaths.length = 0;
 
+  // Create a grid to track occupied positions for better distribution
+  const cellSize = minHairSpacing;
+  const gridCols = Math.ceil(canvas.width / cellSize);
+  const gridRows = Math.ceil(canvas.height / cellSize);
+  const grid = new Map();
+
+  const getGridKey = (x, y) => {
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+    return `${col},${row}`;
+  };
+
+  const isTooClose = (x, y) => {
+    const col = Math.floor(x / cellSize);
+    const row = Math.floor(y / cellSize);
+
+    // Check surrounding cells
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const key = `${col + dx},${row + dy}`;
+        const existing = grid.get(key);
+        if (existing) {
+          for (const pos of existing) {
+            const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
+            if (dist < minHairSpacing) return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
   let created = 0;
   for (let i = 0; i < maxAttempts; i++) {
     if (created >= numOfHair) break;
@@ -128,11 +162,28 @@ function generateRandomHair(numOfHair) {
     const x1 = Math.random() * canvas.width;
     const y1 = Math.random() * canvas.height;
 
-    if (window.isPointInLeg && window.isPointInLeg(x1, y1)) {
+    if (
+      window.isPointInLeg &&
+      window.isPointInLeg(x1, y1) &&
+      !isTooClose(x1, y1)
+    ) {
       const x2 = x1 + randomHairLength * Math.cos(angle);
       const y2 = y1 + randomHairLength * Math.sin(angle);
-      const hairPath = { x1, y1, x2, y2 };
+
+      // Add curve control point for natural hair bend
+      const curvature = (Math.random() - 0.5) * randomHairLength * 0.5;
+      const perpAngle = angle + Math.PI / 2;
+      const cx = (x1 + x2) / 2 + curvature * Math.cos(perpAngle);
+      const cy = (y1 + y2) / 2 + curvature * Math.sin(perpAngle);
+
+      const hairPath = { x1, y1, x2, y2, cx, cy };
       hairPaths.push(hairPath);
+
+      // Add to grid
+      const key = getGridKey(x1, y1);
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push({ x: x1, y: y1 });
+
       created++;
     }
   }
@@ -164,7 +215,7 @@ function update(dt) {
     if (!e.isCut) {
       ctx.beginPath();
       ctx.moveTo(e.x1, e.y1);
-      ctx.lineTo(e.x2, e.y2);
+      ctx.quadraticCurveTo(e.cx, e.cy, e.x2, e.y2);
       ctx.stroke();
     }
   });
