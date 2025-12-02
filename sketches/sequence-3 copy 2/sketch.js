@@ -17,8 +17,8 @@ const hairPaths = [];
 const rect = {
   w: 110,
   h: 15,
-  isHovered: false,
-  isDragging: false,
+  //isHovered: false,
+  //isDragging: false,
   offsetX: 0,
   offsetY: 0,
 };
