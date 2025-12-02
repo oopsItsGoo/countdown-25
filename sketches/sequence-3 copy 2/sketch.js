@@ -282,15 +282,26 @@ function update(dt) {
   ctx.lineWidth = 5;
   ctx.strokeStyle = "black";
 
+  // Cut hair when rectangle hovers over them
   hairPaths.forEach((e) => {
     if (
       window.isPointInThree &&
       (window.isPointInThree(e.x1, e.y1) || window.isPointInThree(e.x2, e.y2))
     ) {
-      if (
-        math.dist(e.x1, e.y1, input.getX(), input.getY()) < 30 ||
-        math.dist(e.x2, e.y2, input.getX(), input.getY()) < 30
-      ) {
+      // Check if hair root or tip is inside rectangle bounds
+      const isRootInRect =
+        e.x1 >= rectX - rect.w / 2 &&
+        e.x1 <= rectX + rect.w / 2 &&
+        e.y1 >= rectY - rect.h / 2 &&
+        e.y1 <= rectY + rect.h / 2;
+
+      const isTipInRect =
+        e.x2 >= rectX - rect.w / 2 &&
+        e.x2 <= rectX + rect.w / 2 &&
+        e.y2 >= rectY - rect.h / 2 &&
+        e.y2 <= rectY + rect.h / 2;
+
+      if (isRootInRect || isTipInRect) {
         e.isCut = true;
       }
     }
