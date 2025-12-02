@@ -305,11 +305,29 @@ function update(dt) {
         e.y2 >= rectY - rect.h / 2 &&
         e.y2 <= rectY + rect.h / 2;
 
-      if (isRootInRect || isTipInRect) {
+      if ((isRootInRect || isTipInRect) && !e.isCut) {
         e.isCut = true;
+        e.cutProgress = 0;
+        e.fallVelocity = 0;
       }
     }
   });
+
+  // Update falling hair
+  hairPaths.forEach((e) => {
+    if (e.isCut && e.cutProgress !== undefined) {
+      e.fallVelocity += 0.5; // Gravity acceleration
+      e.cutProgress += e.fallVelocity;
+    }
+  });
+
+  // Remove hair that has fallen off screen
+  for (let i = hairPaths.length - 1; i >= 0; i--) {
+    const e = hairPaths[i];
+    if (e.isCut && e.cutProgress > canvas.height + 100) {
+      hairPaths.splice(i, 1);
+    }
+  }
 
   hairPaths.forEach((e) => {
     ctx.beginPath();
@@ -320,6 +338,17 @@ function update(dt) {
       ctx.beginPath();
       ctx.moveTo(e.x1, e.y1);
       ctx.quadraticCurveTo(e.cx, e.cy, e.x2, e.y2);
+      ctx.stroke();
+    } else if (e.cutProgress !== undefined) {
+      // Draw falling hair
+      ctx.beginPath();
+      ctx.moveTo(e.x1, e.y1 + e.cutProgress);
+      ctx.quadraticCurveTo(
+        e.cx,
+        e.cy + e.cutProgress,
+        e.x2,
+        e.y2 + e.cutProgress
+      );
       ctx.stroke();
     }
   });
