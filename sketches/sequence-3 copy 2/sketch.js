@@ -259,8 +259,12 @@ function update(dt) {
       rect.offsetY = razor.y - mouseY;
     }
     if (rect.isDragging) {
-      razor.x = mouseX + rect.offsetX;
-      razor.y = mouseY + rect.offsetY;
+      // Smooth lerp towards mouse position while dragging
+      const dragEase = 0.25; // Higher value = more responsive dragging
+      const targetX = mouseX + rect.offsetX;
+      const targetY = mouseY + rect.offsetY;
+      razor.x += (targetX - razor.x) * dragEase;
+      razor.y += (targetY - razor.y) * dragEase;
     }
   } else {
     if (rect.isDragging) {
