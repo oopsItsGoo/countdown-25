@@ -69,6 +69,7 @@ const tattooDesign_01 = {
   width: 0,
   height: 0,
   opacity: 1,
+  onSkin: false,
 };
 
 loadTattooDesign(tattooDesign_01, "/Assets/SVG/tattoo-design-01.svg");
@@ -79,6 +80,7 @@ const tattooDesign_02 = {
   width: 0,
   height: 0,
   opacity: 1,
+  onSkin: false,
 };
 
 loadTattooDesign(tattooDesign_02, "/Assets/SVG/tattoo-design-02.svg");
@@ -89,6 +91,7 @@ const tattooDesign_03 = {
   width: 0,
   height: 0,
   opacity: 1,
+  onSkin: false,
 };
 
 loadTattooDesign(tattooDesign_03, "/Assets/SVG/tattoo-design-03.svg");
@@ -199,19 +202,20 @@ function update(dt) {
         }
       }
 
-      // Easing function for smooth intro (smoothstep)
-      const ease =
-        introProgress < 1
-          ? introProgress * introProgress * (3 - 2 * introProgress)
-          : 1;
+      // Only animate during intro, don't override positions after animation completes
+      if (!introComplete) {
+        // Easing function for smooth intro (smoothstep)
+        const ease = introProgress * introProgress * (3 - 2 * introProgress);
 
-      // Animate back sliding in from left
-      const backStartX = -back.width;
-      back.x = backStartX + (back.targetX - backStartX) * ease;
+        // Animate back sliding in from left
+        const backStartX = -back.width;
+        back.x = backStartX + (back.targetX - backStartX) * ease;
 
-      // Animate paper sliding in from bottom
-      const paperStartY = canvas.height + paper.height;
-      paper.y = paperStartY + (paper.targetY - paperStartY) * ease;
+        // Animate paper sliding in from bottom
+        const paperStartY = canvas.height + paper.height;
+        paper.x = paper.targetX; // Keep x at target position during slide-in
+        paper.y = paperStartY + (paper.targetY - paperStartY) * ease;
+      }
 
       if (paper.hasReturned) {
         nextState = State.SecondDesign;
@@ -265,6 +269,7 @@ function update(dt) {
       // Draw all previously placed failed attempts
       placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
       activeDesign = tattooDesign_01;
+      console.log("ACTIVE DESIGN FIRST:", activeDesign);
       updateObject(tattooDesign_01);
       break;
     case State.SecondDesign:
@@ -309,23 +314,6 @@ function update(dt) {
 
   DEBUG_TwoRectangle();
   DEBUG_BackRectangle();
-}
-
-/**
- * function that updates two position and color depending if it's on the skin or on the paper
- */
-function updateTwo() {
-  two.height = paper.height * stencilRatio;
-  two.width = two.height / two.ratio;
-
-  if (two.onSkin) {
-    two.opacity = 1;
-  } else {
-    two.x = paper.x;
-    two.y = paper.y;
-  }
-
-  drawTwo();
 }
 
 function drawBack() {
@@ -376,7 +364,12 @@ function updatePaper() {
   paper.width = paper.height / paper.ratio;
 
   if (input.isPressed()) {
-    if (!paper.isDragging && paper.isHovered && !paper.goToOriginal) {
+    if (
+      !paper.isDragging &&
+      paper.isHovered &&
+      !paper.goToOriginal &&
+      introComplete
+    ) {
       paper.isDragging = true;
       paper.goToOriginal = false;
     }
@@ -630,7 +623,7 @@ function updateObject(object) {
   object.width = object.height / object.ratio;
 
   if (!object.onSkin) {
-    // only follow paper when not on skin
+    // only follow paper when not on skin - update both x and y
     object.x = paper.x;
     object.y = paper.y;
   }
