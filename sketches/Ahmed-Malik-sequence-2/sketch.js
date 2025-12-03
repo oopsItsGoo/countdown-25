@@ -273,14 +273,13 @@ function update(dt) {
           // Easing function for smooth outro (smoothstep)
           const ease = outroProgress * outroProgress * (3 - 2 * outroProgress);
 
-          // Slide back and paper out to the right
-          const backTargetX = canvas.width + back.width;
-          back.x = back.targetX + (backTargetX - back.targetX) * ease;
+          // Slide back and paper out to the right by the same distance
+          const outroDistance = canvas.width * 1.5;
+          back.x = back.targetX + outroDistance * ease;
 
           // Calculate offset for designs on skin
-          backOutroOffset = (backTargetX - back.targetX) * ease;
-          const paperTargetX = canvas.width + paper.width;
-          paper.x = paper.originalX + (paperTargetX - paper.originalX) * ease;
+          backOutroOffset = outroDistance * ease;
+          paper.x = paper.originalX + outroDistance * ease;
         }
 
         // Transition to finished after outro completes
@@ -411,7 +410,8 @@ function updatePaper() {
       !paper.isDragging &&
       paper.isHovered &&
       !paper.goToOriginal &&
-      introComplete
+      introComplete &&
+      !two.onSkin
     ) {
       paper.isDragging = true;
       paper.goToOriginal = false;

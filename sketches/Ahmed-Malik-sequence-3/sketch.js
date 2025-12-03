@@ -49,9 +49,17 @@ let introProgress = 0;
 const introDuration = 2.0;
 let introComplete = false;
 
+// Outro animation
+let outroWaitProgress = 0;
+const outroWaitDuration = 2.0; // Wait time before sliding out
+let outroProgress = 0;
+const outroDuration = 2.0;
+let outroStarted = false;
+
 // Hair counter
 let hairsInMaskCount = 0;
 let shavedHairsInMaskCount = 0;
+const hairThresholdPercentage = 0.95;
 
 // load threeSVG as image
 let threeMaskScale = 0.5;
@@ -246,6 +254,7 @@ function initRazor() {
 }
 
 function update(dt) {
+  console.log("Current State:", currentState);
   let nextState = undefined;
   switch (currentState) {
     case State.WaitingForInput:
@@ -254,10 +263,60 @@ function update(dt) {
       }
       break;
     case State.Intro:
+      // Update intro animation
+      introProgress += dt / introDuration;
+      if (introProgress >= 1) {
+        introProgress = 1;
+        introComplete = true;
+        nextState = State.Shaving;
+      }
       break;
     case State.Shaving:
+      if (
+        shavedHairsInMaskCount / hairsInMaskCount >=
+        hairThresholdPercentage
+      ) {
+        nextState = State.Done;
+        // Make all remaining hairs in mask fall when transitioning to Done
+        hairPaths.forEach((e) => {
+          if (e.isInMask && !e.isCut) {
+            e.isCut = true;
+            e.cutProgress = 0;
+            e.fallVelocity = 0;
+          }
+        });
+      }
       break;
     case State.Done:
+      // Check if razor has returned to target position
+      const razorReturnDistance = math.dist(
+        razor.x,
+        razor.y,
+        razor.targetX,
+        razor.targetY
+      );
+
+      if (razorReturnDistance < 5) {
+        // Razor is back at target, start waiting
+        if (!outroStarted) {
+          outroWaitProgress += dt / outroWaitDuration;
+
+          if (outroWaitProgress >= 1) {
+            outroWaitProgress = 1;
+            outroStarted = true;
+          }
+        }
+
+        // After wait, start outro animation
+        if (outroStarted) {
+          outroProgress += dt / outroDuration;
+
+          if (outroProgress >= 1) {
+            outroProgress = 1;
+            nextState = State.Finished;
+          }
+        }
+      }
       break;
     case State.Finished:
       break;
@@ -266,6 +325,36 @@ function update(dt) {
   if (nextState !== undefined) {
     currentState = nextState;
   }
+
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Calculate easing and offsets based on current state
+  let legOffsetX = 0;
+  let razorOffsetX = 0;
+  let ease = 1;
+
+  if (currentState === State.Intro) {
+    // Easing function for smooth intro
+    ease = introProgress * introProgress * (3 - 2 * introProgress);
+    legOffsetX = (1 - ease) * -canvas.width * 1;
+  } else if (currentState === State.Done && outroStarted) {
+    // Easing function for smooth outro
+    const outroEase = outroProgress * outroProgress * (3 - 2 * outroProgress);
+    legOffsetX = outroEase * canvas.width * 1.5;
+    razorOffsetX = outroEase * canvas.width * 1.5;
+  } else if (currentState === State.Finished) {
+    // Keep elements off-screen after outro
+    legOffsetX = canvas.width * 1.5;
+    razorOffsetX = canvas.width * 1.5;
+  }
+
+  // Draw leg with intro offset
+  ctx.save();
+  ctx.translate(legOffsetX, 0);
+  ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
   switch (currentState) {
     case State.Finished:
       console.log("FINISHED");
@@ -281,28 +370,6 @@ function update(dt) {
       break;
   }
 
-  // Update intro animation
-  if (!introComplete) {
-    introProgress += dt / introDuration;
-    if (introProgress >= 1) {
-      introProgress = 1;
-      introComplete = true;
-    }
-  }
-
-  // Easing function for smooth intro
-  const ease =
-    introProgress < 1
-      ? introProgress * introProgress * (3 - 2 * introProgress)
-      : 1;
-
-  // Draw leg with intro offset - slide from left
-  ctx.save();
-  const legOffsetX = (1 - ease) * -canvas.width * 1;
-  ctx.translate(legOffsetX, 0);
-  ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
-  ctx.restore();
-
   drawThreeMaskDebug(); //DEBUG
 
   // Check if mouse is hovering over razor (bounds check)
@@ -314,8 +381,8 @@ function update(dt) {
     mouseY >= razor.y &&
     mouseY <= razor.y + razor.height;
 
-  // Handle dragging (only when intro is complete)
-  if (introComplete && input.isPressed()) {
+  // Handle dragging (only during Shaving state)
+  if (currentState === State.Shaving && input.isPressed()) {
     if (!razor.isDragging && razor.isHovered) {
       razor.isDragging = true;
       razor.offsetX = razor.x - mouseX;
@@ -337,16 +404,20 @@ function update(dt) {
 
   // Animate back to target when not dragging using smooth lerp
   if (!razor.isDragging) {
-    if (introComplete) {
-      const ease = 0.08;
-      razor.x += (razor.targetX - razor.x) * ease;
-      razor.y += (razor.targetY - razor.y) * ease;
-    } else {
+    if (currentState === State.Done) {
+      // Only return to target position when in Done state
+      if (!outroStarted) {
+        const returnEase = 0.03;
+        razor.x += (razor.targetX - razor.x) * returnEase;
+        razor.y += (razor.targetY - razor.y) * returnEase;
+      }
+    } else if (currentState === State.Intro) {
       // During intro, animate from bottom
       const razorStartY = canvas.height * 1.2;
       razor.x = razor.targetX;
       razor.y = razorStartY + (razor.targetY - razorStartY) * ease;
     }
+    // During Shaving state: razor stays where it was released (no return animation)
   }
 
   // Rectangle follows razor position
@@ -356,8 +427,8 @@ function update(dt) {
   ctx.lineWidth = 5;
   ctx.strokeStyle = "black";
 
-  // Cut hair when rectangle hovers over them (only when intro complete)
-  if (introComplete) {
+  // Cut hair when rectangle hovers over them (only during Shaving state)
+  if (currentState === State.Shaving) {
     hairPaths.forEach((e) => {
       if (
         window.isPointInThree &&
@@ -437,12 +508,12 @@ function update(dt) {
 
   drawRazorRectangleDebug(rectX, rectY); //DEBUG
 
-  // Draw razor SVG at its position
+  // Draw razor SVG at its position with outro offset
   if (razorLoaded) {
     ctx.save();
     ctx.drawImage(
       razorSVG,
-      razor.x - razor.width / 2,
+      razor.x - razor.width / 2 + razorOffsetX,
       razor.y,
       razor.width,
       razor.height
