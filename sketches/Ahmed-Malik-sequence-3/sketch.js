@@ -33,7 +33,7 @@ const razor = {
   height: 0,
   isHovered: false,
   isDragging: false,
-  showRazorRectDebug: true, //DEBUG
+  showRazorRectDebug: false, //DEBUG
 };
 
 // Intro animation
