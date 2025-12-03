@@ -33,6 +33,7 @@ const razor = {
   height: 0,
   isHovered: false,
   isDragging: false,
+  showRazorRectDebug: true, //DEBUG
 };
 
 // Intro animation
@@ -253,7 +254,7 @@ function update(dt) {
   // Check if mouse is hovering over razor (bounds check)
   const mouseX = input.getX();
   const mouseY = input.getY();
-  rect.isHovered =
+  razor.isHovered =
     mouseX >= razor.x - razor.width / 2 &&
     mouseX <= razor.x + razor.width / 2 &&
     mouseY >= razor.y &&
@@ -261,27 +262,27 @@ function update(dt) {
 
   // Handle dragging (only when intro is complete)
   if (introComplete && input.isPressed()) {
-    if (!rect.isDragging && rect.isHovered) {
-      rect.isDragging = true;
-      rect.offsetX = razor.x - mouseX;
-      rect.offsetY = razor.y - mouseY;
+    if (!razor.isDragging && razor.isHovered) {
+      razor.isDragging = true;
+      razor.offsetX = razor.x - mouseX;
+      razor.offsetY = razor.y - mouseY;
     }
-    if (rect.isDragging) {
+    if (razor.isDragging) {
       // Smooth lerp towards mouse position while dragging
       const dragEase = 0.25; // Higher value = more responsive dragging
-      const targetX = mouseX + rect.offsetX;
-      const targetY = mouseY + rect.offsetY;
+      const targetX = mouseX + razor.offsetX;
+      const targetY = mouseY + razor.offsetY;
       razor.x += (targetX - razor.x) * dragEase;
       razor.y += (targetY - razor.y) * dragEase;
     }
   } else {
-    if (rect.isDragging) {
-      rect.isDragging = false;
+    if (razor.isDragging) {
+      razor.isDragging = false;
     }
   }
 
   // Animate back to target when not dragging using smooth lerp
-  if (!rect.isDragging) {
+  if (!razor.isDragging) {
     if (introComplete) {
       const ease = 0.08;
       razor.x += (razor.targetX - razor.x) * ease;
@@ -375,22 +376,7 @@ function update(dt) {
     }
   });
 
-  // Draw interactive rectangle (debug) - follows razor
-  ctx.beginPath();
-  ctx.rect(rectX - rect.w / 2, rectY - rect.h / 2, rect.w, rect.h);
-  ctx.fillStyle = rect.isDragging
-    ? "rgba(34,34,34,0.3)"
-    : rect.isHovered
-    ? "rgba(51,51,51,0.3)"
-    : "rgba(102,102,102,0.3)";
-  ctx.fill();
-  ctx.strokeStyle = rect.isDragging
-    ? "yellow"
-    : rect.isHovered
-    ? "white"
-    : "#999";
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  drawRazorRectangleDebug(rectX, rectY); //DEBUG
 
   // Draw razor SVG at its position
   if (razorLoaded) {
@@ -407,6 +393,26 @@ function update(dt) {
 }
 
 /* ------------------- DEBUG ----------------*/
+
+function drawRazorRectangleDebug(rectX, rectY) {
+  if (!razor.showRazorRectDebug) return;
+  // Draw interactive rectangle (debug) - follows razor
+  ctx.beginPath();
+  ctx.rect(rectX - rect.w / 2, rectY - rect.h / 2, rect.w, rect.h);
+  ctx.fillStyle = razor.isDragging
+    ? "rgba(34,34,34,0.3)"
+    : razor.isHovered
+    ? "rgba(51,51,51,0.3)"
+    : "rgba(102,102,102,0.3)";
+  ctx.fill();
+  ctx.strokeStyle = razor.isDragging
+    ? "yellow"
+    : razor.isHovered
+    ? "white"
+    : "#999";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+}
 
 function drawThreeMaskDebug() {
   if (!showMaskDebug) return;
