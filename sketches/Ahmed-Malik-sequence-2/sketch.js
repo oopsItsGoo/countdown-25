@@ -302,27 +302,13 @@ function update(dt) {
       //updateTwo();
       break;
   }
-  // change state
-
-  // draw back svg
-  //drawBack();
 
   DEBUGMODE();
 
-  //updateTwo();
   updatePaper();
 
   DEBUG_TwoRectangle();
   DEBUG_BackRectangle();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(input.getX(), input.getY(), 100, 100, 0, 0, Math.PI * 2);
-  ctx.fillStyle = "blue";
-  ctx.globalCompositeOperation = "source-atop";
-  ctx.fill();
-  ctx.restore();
-  ctx.globalCompositeOperation = "source-over";
 }
 
 /**
