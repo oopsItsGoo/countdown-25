@@ -5,6 +5,14 @@ const { renderer, input, math, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
 
 /* ------------- SETUP ------------- */
+const State = {
+  WaitingForInput: "waitingForInput",
+  Intro: "intro",
+  Shaving: "shaving",
+  Done: "done",
+  Finished: "finished",
+};
+let currentState = State.WaitingForInput;
 // Hair parameters
 const hairNumber = 4000;
 const maxAttempts = 20000;
@@ -40,6 +48,10 @@ const razor = {
 let introProgress = 0;
 const introDuration = 2.0;
 let introComplete = false;
+
+// Hair counter
+let hairsInMaskCount = 0;
+let shavedHairsInMaskCount = 0;
 
 // load threeSVG as image
 let threeMaskScale = 0.5;
@@ -90,6 +102,7 @@ function checkIfReady() {
     initRazor();
     generateRandomHair(hairNumber);
     console.log("Hairs generated:", hairPaths.length);
+    console.log("Hairs inside mask:", hairsInMaskCount);
     run(update);
   }
 }
@@ -199,8 +212,17 @@ function generateRandomHair(numOfHair) {
       const cx = (x1 + x2) / 2 + curvature * Math.cos(perpAngle);
       const cy = (y1 + y2) / 2 + curvature * Math.sin(perpAngle);
 
-      const hairPath = { x1, y1, x2, y2, cx, cy };
+      // Check if hair is inside the three mask
+      const isInMask =
+        window.isPointInThree &&
+        (window.isPointInThree(x1, y1) || window.isPointInThree(x2, y2));
+
+      const hairPath = { x1, y1, x2, y2, cx, cy, isInMask };
       hairPaths.push(hairPath);
+
+      if (isInMask) {
+        hairsInMaskCount++;
+      }
 
       // Add to grid
       const key = getGridKey(x1, y1);
@@ -224,8 +246,40 @@ function initRazor() {
 }
 
 function update(dt) {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let nextState = undefined;
+  switch (currentState) {
+    case State.WaitingForInput:
+      if (input.hasStarted()) {
+        nextState = State.Intro;
+      }
+      break;
+    case State.Intro:
+      break;
+    case State.Shaving:
+      break;
+    case State.Done:
+      break;
+    case State.Finished:
+      break;
+  }
+
+  if (nextState !== undefined) {
+    currentState = nextState;
+  }
+  switch (currentState) {
+    case State.Finished:
+      console.log("FINISHED");
+      finish();
+      break;
+    case State.WaitingForInput:
+      break;
+    case State.Intro:
+      break;
+    case State.Shaving:
+      break;
+    case State.Done:
+      break;
+  }
 
   // Update intro animation
   if (!introComplete) {
@@ -326,6 +380,11 @@ function update(dt) {
           e.isCut = true;
           e.cutProgress = 0;
           e.fallVelocity = 0;
+
+          // Decrease counter if hair was in mask
+          if (e.isInMask) {
+            shavedHairsInMaskCount++;
+          }
         }
       }
     });

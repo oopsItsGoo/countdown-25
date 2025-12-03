@@ -7,6 +7,8 @@ const { ctx, canvas } = renderer;
 let DEBUG = false;
 let stencilRatio = 0.5;
 let slideInDuration = 2.0; // Duration of slide-in animations in seconds (adjust for speed)
+let slideOutDuration = 2.0; // Duration of slide-out animations in seconds
+let waitBeforeOutro = 2.0; // Wait time in seconds before sliding out (adjust for speed)
 let VISIBILITY_THRESHOLD = 95; // Percentage threshold for successful placement
 
 const State = {
@@ -22,6 +24,11 @@ let startInputX = 0;
 let activeDesign = null; // track which design is currently active
 let introProgress = 0;
 let introComplete = false;
+let outroWaitProgress = 0;
+let outroProgress = 0;
+let outroStarted = false;
+let outroComplete = false;
+let backOutroOffset = 0; // Track how much the back has moved during outro
 
 /* ------------------------------ load SVG --------------------------------*/
 const back = {
@@ -241,9 +248,45 @@ function update(dt) {
     }
     case State.Two: {
       console.log("STATE TWO UPDATE");
-      if (paper.hasReturned) {
-        nextState = State.Finished;
-        paper.hasReturned = false;
+
+      // Check if the two has been successfully placed
+      if (paper.hasReturned && two.onSkin) {
+        // Start waiting before outro
+        if (!outroStarted) {
+          outroWaitProgress += dt / waitBeforeOutro;
+
+          if (outroWaitProgress >= 1) {
+            outroStarted = true;
+            outroWaitProgress = 1;
+          }
+        }
+
+        // After wait, start outro animation
+        if (outroStarted && !outroComplete) {
+          outroProgress += dt / slideOutDuration;
+
+          if (outroProgress >= 1) {
+            outroProgress = 1;
+            outroComplete = true;
+          }
+
+          // Easing function for smooth outro (smoothstep)
+          const ease = outroProgress * outroProgress * (3 - 2 * outroProgress);
+
+          // Slide back and paper out to the right
+          const backTargetX = canvas.width + back.width;
+          back.x = back.targetX + (backTargetX - back.targetX) * ease;
+
+          // Calculate offset for designs on skin
+          backOutroOffset = (backTargetX - back.targetX) * ease;
+          const paperTargetX = canvas.width + paper.width;
+          paper.x = paper.originalX + (paperTargetX - paper.originalX) * ease;
+        }
+
+        // Transition to finished after outro completes
+        if (outroComplete) {
+          nextState = State.Finished;
+        }
       }
       break;
     }
@@ -637,11 +680,14 @@ function drawObject(object) {
   if (object.onSkin) {
     ctx.globalCompositeOperation = "source-atop";
   }
-  ctx.globalAlpha = object.opacity; // Set opacity (0.0 to 1.0)
+  ctx.globalAlpha = object.opacity; // Set opacity (0.0 to 1.0);
+
+  // Apply outro offset if design is on skin
+  const xOffset = object.onSkin ? backOutroOffset : 0;
 
   ctx.drawImage(
     object.svg,
-    object.x - object.width / 2,
+    object.x - object.width / 2 + xOffset,
     object.y - object.height / 2,
     object.width,
     object.height
@@ -654,9 +700,13 @@ function drawPlacedDesign(design) {
   ctx.save();
   ctx.globalCompositeOperation = "source-atop";
   ctx.globalAlpha = design.opacity;
+
+  // Apply outro offset to placed designs
+  const xOffset = backOutroOffset;
+
   ctx.drawImage(
     design.svg,
-    design.x - design.width / 2,
+    design.x - design.width / 2 + xOffset,
     design.y - design.height / 2,
     design.width,
     design.height
