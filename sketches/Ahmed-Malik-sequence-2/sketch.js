@@ -4,24 +4,20 @@ import { Spring } from "../_shared/spring.js";
 const { renderer, input, math, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
 
-let DEBUG = true;
-
-window.addEventListener("resize", () => {
-  updateSizes();
-});
-
-function updateSizes() {
-  //TODO
-}
+let DEBUG = false;
+let stencilRatio = 0.5;
 
 const State = {
   WaitingForInput: "waitingForInput",
-  Interactive: "interactive",
-  Falling: "falling",
+  FirstDesign: "firstDesign",
+  SecondDesign: "secondDesign",
+  ThirdDesign: "thirdDesign",
+  Two: "two",
   Finished: "finished",
 };
 let currentState = State.WaitingForInput;
 let startInputX = 0;
+let activeDesign = null; // track which design is currently active
 
 /* ------------------------------ load SVG --------------------------------*/
 const back = {
@@ -57,6 +53,36 @@ const two = {
   onSkin: false,
 };
 
+const tattooDesign_01 = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  opacity: 1,
+};
+
+loadTattooDesign(tattooDesign_01, "/Assets/SVG/tattoo-design-01.svg");
+
+const tattooDesign_02 = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  opacity: 1,
+};
+
+loadTattooDesign(tattooDesign_02, "/Assets/SVG/tattoo-design-02.svg");
+
+const tattooDesign_03 = {
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  opacity: 1,
+};
+
+loadTattooDesign(tattooDesign_03, "/Assets/SVG/tattoo-design-03.svg");
+
 // load back svg
 const backSVG = new Image();
 backSVG.src = "/Assets/SVG/back.svg";
@@ -81,8 +107,9 @@ paperSVG.onload = () => {
   paper.svg = paperSVG;
   paper.width = paperSVG.width;
   paper.height = paperSVG.height;
-  (paper.ratio = paperSVG.naturalHeight / paperSVG.naturalWidth),
-    console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
+  paper.opacity = 0.7;
+  paper.ratio = paperSVG.naturalHeight / paperSVG.naturalWidth;
+  console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
   paper.x = canvas.width * 0.85;
   paper.y = canvas.height * 0.33;
   paper.rect = {
@@ -99,10 +126,6 @@ const twoSVG = new Image();
 twoSVG.src = "/Assets/SVG/2.svg";
 two.loaded = false;
 twoSVG.onload = () => {
-  //TODO
-  checkIfReady();
-};
-twoSVG.onload = () => {
   two.loaded = true;
   two.svg = twoSVG;
   two.ratio = twoSVG.naturalHeight / twoSVG.naturalWidth;
@@ -110,13 +133,14 @@ twoSVG.onload = () => {
   two.height = twoSVG.height;
   two.x = canvas.width / 2;
   two.y = canvas.height / 2;
+  two.free = true;
   checkIfReady();
 };
 
 function checkIfReady() {
   if (back.loaded && paper.loaded && two.loaded) {
     console.log("All SVGs loaded:");
-    two.height = paper.height * 0.5;
+    two.height = paper.height * stencilRatio;
     two.width = two.height / two.ratio;
     run(update);
   }
@@ -128,22 +152,33 @@ function update(dt) {
     case State.WaitingForInput: {
       if (input.hasStarted()) {
         startInputX = input.getX();
-        nextState = State.Interactive;
+        nextState = State.FirstDesign;
       }
+      nextState = State.FirstDesign;
+
       break;
     }
 
-    case State.Interactive: {
-      nextState = State.Falling;
+    case State.FirstDesign: {
+      console.log("STATE FirstDesign UPDATE");
+      //nextState = State.SecondDesign;
       break;
     }
-
-    case State.Falling: {
-      const drag = 0.1;
-      const gravity = canvas.height * 3;
+    case State.SecondDesign: {
+      console.log("STATE SecondDesign UPDATE");
+      nextState = State.ThirdDesign;
       break;
     }
-
+    case State.ThirdDesign: {
+      console.log("STATE ThirdDesign UPDATE");
+      nextState = State.Two;
+      break;
+    }
+    case State.Two: {
+      console.log("STATE TWO UPDATE");
+      //nextState = State.Finished;
+      break;
+    }
     case State.Finished: {
       break;
     }
@@ -151,39 +186,68 @@ function update(dt) {
 
   if (nextState !== undefined) {
     currentState = nextState;
-    switch (currentState) {
-      case State.Finished:
-        finish();
-        break;
-      case State.Interactive:
-        break;
-      case State.Falling:
-        break;
-    }
-    // change state
   }
-
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  switch (currentState) {
+    case State.Finished:
+      console.log("FINISHED");
+      finish();
+      break;
+    case State.WaitingForInput:
+      console.log("STATE WaitingForInput");
+      break;
+    case State.FirstDesign:
+      console.log("STATE FirstDesign");
+      drawBack();
+      activeDesign = tattooDesign_01;
+      updateObject(tattooDesign_01);
+      break;
+    case State.SecondDesign:
+      console.log("STATE SecondDesign");
+      drawBack();
+      activeDesign = tattooDesign_02;
+      updateObject(tattooDesign_02);
+      break;
+    case State.ThirdDesign:
+      console.log("STATE ThirdDesign");
+      drawBack();
+      activeDesign = tattooDesign_03;
+      updateObject(tattooDesign_03);
+      break;
+    case State.Two:
+      console.log("STATE TWO");
+      drawBack();
+      activeDesign = two;
+      updateTwo();
+      break;
+  }
+  // change state
 
   // draw back svg
-  drawBack();
+  //drawBack();
 
   DEBUGMODE();
 
+  //updateTwo();
   updatePaper();
 
   DEBUG_TwoRectangle();
   DEBUG_BackRectangle();
 
-  updateTwo();
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(input.getX(), input.getY(), 100, 100, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "blue";
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.fill();
+  ctx.restore();
+  ctx.globalCompositeOperation = "source-over";
 }
 
 /**
  * function that updates two position and color depending if it's on the skin or on the paper
  */
 function updateTwo() {
-  two.height = paper.height * 0.5;
+  two.height = paper.height * stencilRatio;
   two.width = two.height / two.ratio;
 
   if (two.onSkin) {
@@ -221,7 +285,7 @@ function drawTwo() {
 
 function drawPaper() {
   ctx.save();
-
+  ctx.globalAlpha = paper.opacity;
   ctx.drawImage(
     paper.svg,
     paper.x - paper.width / 2,
@@ -250,6 +314,17 @@ function updatePaper() {
     }
   } else if (paper.isDragging) {
     paper.isDragging = false;
+
+    // set the active design to onSkin so it stays in place
+    if (activeDesign) {
+      activeDesign.onSkin = true;
+    }
+
+    // on release : calculate the functions that allow to know if the two is on the skin or not
+    twoPixels();
+    backPixels();
+
+    //for all (x,y) in the two, check if it's on skin or not
   }
 
   if (paper.isDragging) {
@@ -276,11 +351,52 @@ function findNextState() {}
 
 /* TODO ---------------------- Make that when we leave the two over the body it stays. 
 Then make the pixels that overlap between the 2 and and the body stay on the body and the rest make alpha = 0 ------------*/
+
+//maybe do it with blend mode (composite bled mode) to draw
+
+function checkPixelIsOnSkin() {
+  const tmpTwoCanvas = document.createElement("canvas");
+  tmpTwoCanvas.width = canvas.width;
+  tmpTwoCanvas.height = canvas.height;
+  const tmpCtx = tmpTwoCanvas.getContext("2d");
+  tmpCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+  tmpCtx.drawImage(two.svg, two.x, two.y, two.width, two.height);
+  const twoImageData = tmpCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const backCanvas = document.createElement("canvas");
+  backCanvas.width = canvas.width;
+  backCanvas.height = canvas.height;
+  const backCtx = threeCanvas.getContext("2d");
+  backCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+  backCtx.drawImage(back.svg, back.x, back.y, back.width, back.height);
+  const backImageData = backCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const overlappingPixels = [];
+
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const index = (Math.floor(y) * canvas.width + Math.floor(x)) * 4;
+      const twoAlpha = twoImageData.data[index + 3];
+      const backAlpha = backImageData.data[index + 3];
+
+      overlappingPixels.push({
+        overlapping: twoAlpha > 128 && backAlpha > 128,
+        x,
+        y,
+      });
+    }
+  }
+
+  console.log("overlappingPixels:", overlappingPixels);
+}
+
 function twoPixels() {
   const twoCanvas = document.createElement("canvas");
   twoCanvas.width = canvas.width;
   twoCanvas.height = canvas.height;
-  const twoCtx = threeCanvas.getContext("2d");
+  const twoCtx = twoCanvas.getContext("2d");
   twoCtx.clearRect(0, 0, canvas.width, canvas.height);
 
   twoCtx.drawImage(two.svg, two.x, two.y, two.width, two.height);
@@ -298,7 +414,7 @@ function backPixels() {
   const backCanvas = document.createElement("canvas");
   backCanvas.width = canvas.width;
   backCanvas.height = canvas.height;
-  const backCtx = threeCanvas.getContext("2d");
+  const backCtx = backCanvas.getContext("2d");
   backCtx.clearRect(0, 0, canvas.width, canvas.height);
 
   backCtx.drawImage(back.svg, back.x, back.y, back.width, back.height);
@@ -313,6 +429,56 @@ function backPixels() {
 }
 /* finsih TODO */
 
+function loadTattooDesign(object, path) {
+  // load back svg
+  const tempSVG = new Image();
+  tempSVG.src = path;
+  object.loaded = false;
+  tempSVG.onload = () => {
+    object.loaded = true;
+    object.svg = tempSVG;
+    object.ratio = tempSVG.naturalHeight / tempSVG.naturalWidth;
+    object.height = paper.height * stencilRatio;
+    object.width = object.height / object.ratio;
+    object.x = paper.x;
+    object.y = paper.y;
+    object.free = true;
+  };
+}
+
+function updateObject(object) {
+  object.height = paper.height * stencilRatio;
+  object.width = object.height / object.ratio;
+
+  if (!object.onSkin) {
+    // only follow paper when not on skin
+    object.x = paper.x;
+    object.y = paper.y;
+  }
+
+  // draw the provided object (tattoo design), not the "two"
+  drawObject(object);
+}
+
+function drawObject(object) {
+  ctx.save();
+
+  if (object.onSkin) {
+    ctx.globalCompositeOperation = "source-atop";
+  }
+  ctx.globalAlpha = object.opacity; // Set opacity (0.0 to 1.0)
+
+  ctx.drawImage(
+    object.svg,
+    object.x - object.width / 2,
+    object.y - object.height / 2,
+    object.width,
+    object.height
+  );
+
+  ctx.restore(); // Restore to reset globalAlpha
+}
+
 /* --------------------------- DEBUG ----------------------------------- */
 function DEBUGMODE() {
   if (!DEBUG) return;
@@ -326,21 +492,24 @@ function drawPaperRectangleDebug() {
   if (!DEBUG) return;
   console.log("### DEBUG RECTANGLE DRAW");
 
+  ctx.save();
   ctx.beginPath();
   const debugRect = paper.rect;
   console.log("### DEBUG RECTANGLE:", debugRect);
 
   ctx.rect(debugRect.x, debugRect.y, debugRect.w, debugRect.h);
-  ctx.fillStyle = paper.isHovered ? "green" : "red";
-  ctx.fill();
-  ctx.lineWidth = 10;
+  // removed fill to avoid covering the background
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = paper.isHovered ? "rgba(0,255,0,0.6)" : "rgba(255,0,0,0.6)";
   ctx.stroke();
+  ctx.restore();
 }
 
 function DEBUG_TwoRectangle() {
   if (!DEBUG) return;
   console.log("### DEBUG RECTANGLE TWO DRAW");
 
+  ctx.save();
   ctx.beginPath();
   const debugRect = {
     x: two.x - two.width / 2,
@@ -350,10 +519,11 @@ function DEBUG_TwoRectangle() {
   };
   console.log("### DEBUG RECTANGLE TWO:", debugRect);
   ctx.rect(debugRect.x, debugRect.y, debugRect.w, debugRect.h);
-  ctx.fillStyle = paper.isHovered ? "green" : "red";
-  ctx.fill();
-  ctx.lineWidth = 10;
+  // removed fill to avoid covering the background
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = paper.isHovered ? "rgba(0,255,0,0.6)" : "rgba(255,0,0,0.6)";
   ctx.stroke();
+  ctx.restore();
 }
 
 function DEBUG_BackRectangle() {
