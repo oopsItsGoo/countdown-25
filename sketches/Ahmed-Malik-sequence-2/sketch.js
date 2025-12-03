@@ -49,7 +49,7 @@ const two = {
   targetY: 0,
   width: 0,
   height: 0,
-  opacity: 0.6,
+  opacity: 1,
   onSkin: false,
 };
 
@@ -112,6 +112,9 @@ paperSVG.onload = () => {
   console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
   paper.x = canvas.width * 0.85;
   paper.y = canvas.height * 0.33;
+  paper.originalX = paper.x;
+  paper.originalY = paper.y;
+  paper.goToOriginal = false;
   paper.rect = {
     x: paper.x - paper.width / 2,
     y: paper.y - paper.height / 2,
@@ -134,6 +137,7 @@ twoSVG.onload = () => {
   two.x = canvas.width / 2;
   two.y = canvas.height / 2;
   two.free = true;
+  two.opacitty = 1;
   checkIfReady();
 };
 
@@ -161,22 +165,34 @@ function update(dt) {
 
     case State.FirstDesign: {
       console.log("STATE FirstDesign UPDATE");
-      //nextState = State.SecondDesign;
+      if (paper.hasReturned) {
+        nextState = State.SecondDesign;
+        paper.hasReturned = false;
+      }
       break;
     }
     case State.SecondDesign: {
       console.log("STATE SecondDesign UPDATE");
-      nextState = State.ThirdDesign;
+      if (paper.hasReturned) {
+        nextState = State.ThirdDesign;
+        paper.hasReturned = false;
+      }
       break;
     }
     case State.ThirdDesign: {
       console.log("STATE ThirdDesign UPDATE");
-      nextState = State.Two;
+      if (paper.hasReturned) {
+        nextState = State.Two;
+        paper.hasReturned = false;
+      }
       break;
     }
     case State.Two: {
       console.log("STATE TWO UPDATE");
-      //nextState = State.Finished;
+      if (paper.hasReturned) {
+        nextState = State.Finished;
+        paper.hasReturned = false;
+      }
       break;
     }
     case State.Finished: {
@@ -205,19 +221,28 @@ function update(dt) {
       console.log("STATE SecondDesign");
       drawBack();
       activeDesign = tattooDesign_02;
+      updateObject(tattooDesign_01);
       updateObject(tattooDesign_02);
       break;
     case State.ThirdDesign:
       console.log("STATE ThirdDesign");
       drawBack();
       activeDesign = tattooDesign_03;
+      updateObject(tattooDesign_01);
+      updateObject(tattooDesign_02);
       updateObject(tattooDesign_03);
       break;
     case State.Two:
       console.log("STATE TWO");
       drawBack();
       activeDesign = two;
-      updateTwo();
+      updateObject(tattooDesign_01);
+      updateObject(tattooDesign_02);
+      updateObject(tattooDesign_03);
+      console.log("two opacity before:", two.opacity);
+      updateObject(two);
+      console.log("two opacity after:", two.opacity);
+      //updateTwo();
       break;
   }
   // change state
@@ -253,7 +278,6 @@ function updateTwo() {
   if (two.onSkin) {
     two.opacity = 1;
   } else {
-    two.opacity = 0.6;
     two.x = paper.x;
     two.y = paper.y;
   }
@@ -309,11 +333,13 @@ function updatePaper() {
   paper.width = paper.height / paper.ratio;
 
   if (input.isPressed()) {
-    if (!paper.isDragging && paper.isHovered) {
+    if (!paper.isDragging && paper.isHovered && !paper.goToOriginal) {
       paper.isDragging = true;
+      paper.goToOriginal = false;
     }
   } else if (paper.isDragging) {
     paper.isDragging = false;
+    paper.goToOriginal = true;
 
     // set the active design to onSkin so it stays in place
     if (activeDesign) {
@@ -330,6 +356,16 @@ function updatePaper() {
   if (paper.isDragging) {
     paper.x = input.getX();
     paper.y = input.getY();
+  } else if (paper.goToOriginal) {
+    paper.x = math.lerp(paper.x, paper.originalX, 0.1);
+    paper.y = math.lerp(paper.y, paper.originalY, 0.1);
+
+    if (math.dist(paper.x, paper.y, paper.originalX, paper.originalY) < 1) {
+      paper.goToOriginal = false;
+      paper.x = paper.originalX;
+      paper.y = paper.originalY;
+      paper.hasReturned = true;
+    }
   }
 
   drawPaper();
