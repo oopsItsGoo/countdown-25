@@ -131,7 +131,7 @@ paperSVG.onload = () => {
   paper.svg = paperSVG;
   paper.width = paperSVG.width;
   paper.height = paperSVG.height;
-  paper.opacity = 0.7;
+  paper.opacity = 0.9;
   paper.ratio = paperSVG.naturalHeight / paperSVG.naturalWidth;
   console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
   paper.targetX = canvas.width * 0.85;
@@ -185,7 +185,7 @@ function update(dt) {
         startInputX = input.getX();
         nextState = State.FirstDesign;
       }
-      nextState = State.FirstDesign;
+      //nextState = State.FirstDesign;
 
       break;
     }
@@ -452,7 +452,6 @@ function paperIsHovered() {
     return false;
   }
 }
-function findNextState() {}
 
 /* TODO ---------------------- Make that when we leave the two over the body it stays. 
 Then make the pixels that overlap between the 2 and and the body stay on the body and the rest make alpha = 0 ------------*/
