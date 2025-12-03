@@ -6,6 +6,8 @@ const { ctx, canvas } = renderer;
 
 let DEBUG = false;
 let stencilRatio = 0.5;
+let slideInDuration = 2.0; // Duration of slide-in animations in seconds (adjust for speed)
+let VISIBILITY_THRESHOLD = 95; // Percentage threshold for successful placement
 
 const State = {
   WaitingForInput: "waitingForInput",
@@ -18,6 +20,8 @@ const State = {
 let currentState = State.WaitingForInput;
 let startInputX = 0;
 let activeDesign = null; // track which design is currently active
+let introProgress = 0;
+let introComplete = false;
 
 /* ------------------------------ load SVG --------------------------------*/
 const back = {
@@ -25,6 +29,9 @@ const back = {
   y: 0,
   width: 0,
   height: 0,
+  targetX: 0,
+  targetY: 0,
+  isAnimating: false,
 };
 
 const paper = {
@@ -34,6 +41,9 @@ const paper = {
   height: 0,
   isHovered: false,
   isDragging: false,
+  targetX: 0,
+  targetY: 0,
+  isAnimating: false,
   rect: {
     x: 0,
     y: 0,
@@ -83,6 +93,14 @@ const tattooDesign_03 = {
 
 loadTattooDesign(tattooDesign_03, "/Assets/SVG/tattoo-design-03.svg");
 
+// Array to store all placed designs for each state
+let placedDesigns = {
+  firstDesign: [],
+  secondDesign: [],
+  thirdDesign: [],
+  two: [],
+};
+
 // load back svg
 const backSVG = new Image();
 backSVG.src = "/Assets/SVG/back.svg";
@@ -93,8 +111,11 @@ backSVG.onload = () => {
   back.ratio = backSVG.naturalHeight / backSVG.naturalWidth;
   back.height = canvas.height * 1.1;
   back.width = (canvas.height * 1.1) / back.ratio;
-  back.x = canvas.width / 2 - back.width / 2;
-  back.y = canvas.height / 2 - back.height / 2;
+  back.targetX = canvas.width / 2 - back.width / 2;
+  back.targetY = canvas.height / 2 - back.height / 2;
+  // Start off-screen to the left
+  back.x = -back.width;
+  back.y = back.targetY;
   checkIfReady();
 };
 
@@ -110,10 +131,13 @@ paperSVG.onload = () => {
   paper.opacity = 0.7;
   paper.ratio = paperSVG.naturalHeight / paperSVG.naturalWidth;
   console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
-  paper.x = canvas.width * 0.85;
-  paper.y = canvas.height * 0.33;
-  paper.originalX = paper.x;
-  paper.originalY = paper.y;
+  paper.targetX = canvas.width * 0.85;
+  paper.targetY = canvas.height * 0.33;
+  paper.originalX = paper.targetX;
+  paper.originalY = paper.targetY;
+  // Start off-screen at the bottom
+  paper.x = paper.targetX;
+  paper.y = canvas.height + paper.height;
   paper.goToOriginal = false;
   paper.rect = {
     x: paper.x - paper.width / 2,
@@ -165,6 +189,30 @@ function update(dt) {
 
     case State.FirstDesign: {
       console.log("STATE FirstDesign UPDATE");
+
+      // Update intro animation
+      if (!introComplete) {
+        introProgress += dt / slideInDuration;
+        if (introProgress >= 1) {
+          introProgress = 1;
+          introComplete = true;
+        }
+      }
+
+      // Easing function for smooth intro (smoothstep)
+      const ease =
+        introProgress < 1
+          ? introProgress * introProgress * (3 - 2 * introProgress)
+          : 1;
+
+      // Animate back sliding in from left
+      const backStartX = -back.width;
+      back.x = backStartX + (back.targetX - backStartX) * ease;
+
+      // Animate paper sliding in from bottom
+      const paperStartY = canvas.height + paper.height;
+      paper.y = paperStartY + (paper.targetY - paperStartY) * ease;
+
       if (paper.hasReturned) {
         nextState = State.SecondDesign;
         paper.hasReturned = false;
@@ -209,39 +257,48 @@ function update(dt) {
       finish();
       break;
     case State.WaitingForInput:
-      console.log("STATE WaitingForInput");
+      // console.log("STATE WaitingForInput");
       break;
     case State.FirstDesign:
-      console.log("STATE FirstDesign");
+      // console.log("STATE FirstDesign");
       drawBack();
+      // Draw all previously placed failed attempts
+      placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
       activeDesign = tattooDesign_01;
       updateObject(tattooDesign_01);
       break;
     case State.SecondDesign:
-      console.log("STATE SecondDesign");
+      //console.log("STATE SecondDesign");
       drawBack();
+      placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.secondDesign.forEach((design) => drawPlacedDesign(design));
       activeDesign = tattooDesign_02;
       updateObject(tattooDesign_01);
       updateObject(tattooDesign_02);
       break;
     case State.ThirdDesign:
-      console.log("STATE ThirdDesign");
+      //console.log("STATE ThirdDesign");
       drawBack();
+      placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.secondDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.thirdDesign.forEach((design) => drawPlacedDesign(design));
       activeDesign = tattooDesign_03;
       updateObject(tattooDesign_01);
       updateObject(tattooDesign_02);
       updateObject(tattooDesign_03);
       break;
     case State.Two:
-      console.log("STATE TWO");
+      // console.log("STATE TWO");
       drawBack();
+      placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.secondDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.thirdDesign.forEach((design) => drawPlacedDesign(design));
+      placedDesigns.two.forEach((design) => drawPlacedDesign(design));
       activeDesign = two;
       updateObject(tattooDesign_01);
       updateObject(tattooDesign_02);
       updateObject(tattooDesign_03);
-      console.log("two opacity before:", two.opacity);
       updateObject(two);
-      console.log("two opacity after:", two.opacity);
       //updateTwo();
       break;
   }
@@ -341,16 +398,49 @@ function updatePaper() {
     paper.isDragging = false;
     paper.goToOriginal = true;
 
-    // set the active design to onSkin so it stays in place
-    if (activeDesign) {
-      activeDesign.onSkin = true;
+    // Calculate and log the percentage of the design visible on the back
+    const visiblePercentage = calculateVisiblePercentage(activeDesign);
+    console.log(`Visible percentage on back: ${visiblePercentage.toFixed(2)}%`);
+
+    if (visiblePercentage >= VISIBILITY_THRESHOLD) {
+      // SUCCESS: The design is placed correctly
+      console.log("✓ SUCCESS! Design placed correctly.");
+      if (activeDesign) {
+        activeDesign.onSkin = true;
+      }
+    } else {
+      // FAILURE: Not enough visibility, keep the design where it is and create a new copy
+      console.log("✗ FAILED! Not enough visibility. Creating new copy...");
+
+      if (activeDesign) {
+        // Keep the current design where it was released
+        activeDesign.onSkin = true;
+
+        // Store this failed attempt
+        const currentStateKey = getCurrentStateKey();
+        if (currentStateKey) {
+          placedDesigns[currentStateKey].push({
+            x: activeDesign.x,
+            y: activeDesign.y,
+            width: activeDesign.width,
+            height: activeDesign.height,
+            svg: activeDesign.svg,
+            opacity: activeDesign.opacity,
+            ratio: activeDesign.ratio,
+          });
+        }
+
+        // Reset the active design to follow the paper again
+        activeDesign.onSkin = false;
+        activeDesign.x = paper.x;
+        activeDesign.y = paper.y;
+      }
+
+      // Don't allow state transition
+      paper.goToOriginal = false;
+      paper.x = paper.originalX;
+      paper.y = paper.originalY;
     }
-
-    // on release : calculate the functions that allow to know if the two is on the skin or not
-    twoPixels();
-    backPixels();
-
-    //for all (x,y) in the two, check if it's on skin or not
   }
 
   if (paper.isDragging) {
@@ -463,6 +553,73 @@ function backPixels() {
     return imageData.data[index + 3] > 128;
   };
 }
+
+/**
+ * Calculate the percentage of the design that overlaps with the back
+ * @param {object} design - The design object (tattooDesign_01, tattooDesign_02, tattooDesign_03, or two)
+ * @returns {number} - Percentage of visible pixels (0-100)
+ */
+function calculateVisiblePercentage(design) {
+  if (!design || !design.svg) return 0;
+
+  // Create canvas for the design
+  const designCanvas = document.createElement("canvas");
+  designCanvas.width = canvas.width;
+  designCanvas.height = canvas.height;
+  const designCtx = designCanvas.getContext("2d");
+  designCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw the design at its current position
+  designCtx.drawImage(
+    design.svg,
+    design.x - design.width / 2,
+    design.y - design.height / 2,
+    design.width,
+    design.height
+  );
+  const designImageData = designCtx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  // Create canvas for the back
+  const backCanvas = document.createElement("canvas");
+  backCanvas.width = canvas.width;
+  backCanvas.height = canvas.height;
+  const backCtx = backCanvas.getContext("2d");
+  backCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+  backCtx.drawImage(back.svg, back.x, back.y, back.width, back.height);
+  const backImageData = backCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let totalDesignPixels = 0;
+  let overlappingPixels = 0;
+
+  // Check each pixel
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const index = (y * canvas.width + x) * 4;
+      const designAlpha = designImageData.data[index + 3];
+      const backAlpha = backImageData.data[index + 3];
+
+      // If the design has a visible pixel at this position
+      if (designAlpha > 128) {
+        totalDesignPixels++;
+
+        // If the back also has a visible pixel at this position
+        if (backAlpha > 128) {
+          overlappingPixels++;
+        }
+      }
+    }
+  }
+
+  // Calculate percentage
+  if (totalDesignPixels === 0) return 0;
+  return (overlappingPixels / totalDesignPixels) * 100;
+}
 /* finsih TODO */
 
 function loadTattooDesign(object, path) {
@@ -513,6 +670,35 @@ function drawObject(object) {
   );
 
   ctx.restore(); // Restore to reset globalAlpha
+}
+
+function drawPlacedDesign(design) {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.globalAlpha = design.opacity;
+  ctx.drawImage(
+    design.svg,
+    design.x - design.width / 2,
+    design.y - design.height / 2,
+    design.width,
+    design.height
+  );
+  ctx.restore();
+}
+
+function getCurrentStateKey() {
+  switch (currentState) {
+    case State.FirstDesign:
+      return "firstDesign";
+    case State.SecondDesign:
+      return "secondDesign";
+    case State.ThirdDesign:
+      return "thirdDesign";
+    case State.Two:
+      return "two";
+    default:
+      return null;
+  }
 }
 
 /* --------------------------- DEBUG ----------------------------------- */
