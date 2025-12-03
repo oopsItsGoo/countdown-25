@@ -13,7 +13,7 @@ const minHairLength = 50;
 const minHairSpacing = 8; // Minimum distance between hair roots
 const hairPaths = [];
 
-// Interactive rectangle parameters (center-based)
+// rectangle parameters
 const rect = {
   w: 110,
   h: 15,
@@ -23,7 +23,7 @@ const rect = {
   offsetY: 0,
 };
 
-// Razor position (the draggable element)
+// Razor position
 const razor = {
   x: 0,
   y: 0,
@@ -31,10 +31,17 @@ const razor = {
   targetY: 0,
   width: 0,
   height: 0,
+  isHovered: false,
+  isDragging: false,
 };
 
+// Intro animation
+let introProgress = 0;
+const introDuration = 2.0;
+let introComplete = false;
+
 // load threeSVG as image
-let threeMaskScale = 0.5; // This will now be relative to canvas height like the leg
+let threeMaskScale = 0.5;
 let threeMaskAspect;
 let threeMaskXFrac = 0.5;
 let threeMaskYFrac = 0.5;
@@ -79,7 +86,7 @@ function checkIfReady() {
   if (svgLoaded && maskLoaded && razorLoaded) {
     createisPointInLegFunction();
     createIsPointInThreeFunction();
-    initRect();
+    initRazor();
     generateRandomHair(hairNumber);
     console.log("Hairs generated:", hairPaths.length);
     run(update);
@@ -128,7 +135,7 @@ function createIsPointInThreeFunction() {
 window.addEventListener("resize", () => {
   // If your engine resizes canvas elsewhere, ensure canvas dimensions are updated first.
   updateThreeMaskLayout();
-  initRect();
+  initRazor();
 });
 
 function createisPointInLegFunction() {
@@ -167,26 +174,6 @@ function generateRandomHair(numOfHair) {
     return `${col},${row}`;
   };
 
-  const isTooClose = (x, y) => {
-    const col = Math.floor(x / cellSize);
-    const row = Math.floor(y / cellSize);
-
-    // Check surrounding cells
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        const key = `${col + dx},${row + dy}`;
-        const existing = grid.get(key);
-        if (existing) {
-          for (const pos of existing) {
-            const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
-            if (dist < minHairSpacing) return true;
-          }
-        }
-      }
-    }
-    return false;
-  };
-
   let created = 0;
   for (let i = 0; i < maxAttempts; i++) {
     if (created >= numOfHair) break;
@@ -201,11 +188,7 @@ function generateRandomHair(numOfHair) {
     const x1 = Math.random() * canvas.width;
     const y1 = Math.random() * canvas.height;
 
-    if (
-      window.isPointInLeg &&
-      window.isPointInLeg(x1, y1) &&
-      !isTooClose(x1, y1)
-    ) {
+    if (window.isPointInLeg && window.isPointInLeg(x1, y1)) {
       const x2 = x1 + randomHairLength * Math.cos(angle);
       const y2 = y1 + randomHairLength * Math.sin(angle);
 
@@ -228,18 +211,43 @@ function generateRandomHair(numOfHair) {
   }
 }
 
-function initRect() {
+function initRazor() {
   razor.x = canvas.width * 0.85;
   razor.y = canvas.height * 0.5;
   razor.targetX = razor.x;
   razor.targetY = razor.y;
+
+  // Start intro animation
+  introProgress = 0;
+  introComplete = false;
 }
 
 function update(dt) {
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Update intro animation
+  if (!introComplete) {
+    introProgress += dt / introDuration;
+    if (introProgress >= 1) {
+      introProgress = 1;
+      introComplete = true;
+    }
+  }
+
+  // Easing function for smooth intro
+  const ease =
+    introProgress < 1
+      ? introProgress * introProgress * (3 - 2 * introProgress)
+      : 1;
+
+  // Draw leg with intro offset - slide from left
+  ctx.save();
+  const legOffsetX = (1 - ease) * -canvas.width * 1;
+  ctx.translate(legOffsetX, 0);
   ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
   drawThreeMaskDebug(); //DEBUG
 
   // Check if mouse is hovering over razor (bounds check)
@@ -251,8 +259,8 @@ function update(dt) {
     mouseY >= razor.y &&
     mouseY <= razor.y + razor.height;
 
-  // Handle dragging
-  if (input.isPressed()) {
+  // Handle dragging (only when intro is complete)
+  if (introComplete && input.isPressed()) {
     if (!rect.isDragging && rect.isHovered) {
       rect.isDragging = true;
       rect.offsetX = razor.x - mouseX;
@@ -274,9 +282,16 @@ function update(dt) {
 
   // Animate back to target when not dragging using smooth lerp
   if (!rect.isDragging) {
-    const ease = 0.08;
-    razor.x += (razor.targetX - razor.x) * ease;
-    razor.y += (razor.targetY - razor.y) * ease;
+    if (introComplete) {
+      const ease = 0.08;
+      razor.x += (razor.targetX - razor.x) * ease;
+      razor.y += (razor.targetY - razor.y) * ease;
+    } else {
+      // During intro, animate from bottom
+      const razorStartY = canvas.height * 1.2;
+      razor.x = razor.targetX;
+      razor.y = razorStartY + (razor.targetY - razorStartY) * ease;
+    }
   }
 
   // Rectangle follows razor position
@@ -286,32 +301,34 @@ function update(dt) {
   ctx.lineWidth = 5;
   ctx.strokeStyle = "black";
 
-  // Cut hair when rectangle hovers over them
-  hairPaths.forEach((e) => {
-    if (
-      window.isPointInThree &&
-      (window.isPointInThree(e.x1, e.y1) || window.isPointInThree(e.x2, e.y2))
-    ) {
-      // Check if hair root or tip is inside rectangle bounds
-      const isRootInRect =
-        e.x1 >= rectX - rect.w / 2 &&
-        e.x1 <= rectX + rect.w / 2 &&
-        e.y1 >= rectY - rect.h / 2 &&
-        e.y1 <= rectY + rect.h / 2;
+  // Cut hair when rectangle hovers over them (only when intro complete)
+  if (introComplete) {
+    hairPaths.forEach((e) => {
+      if (
+        window.isPointInThree &&
+        (window.isPointInThree(e.x1, e.y1) || window.isPointInThree(e.x2, e.y2))
+      ) {
+        // Check if hair root or tip is inside rectangle bounds
+        const isRootInRect =
+          e.x1 >= rectX - rect.w / 2 &&
+          e.x1 <= rectX + rect.w / 2 &&
+          e.y1 >= rectY - rect.h / 2 &&
+          e.y1 <= rectY + rect.h / 2;
 
-      const isTipInRect =
-        e.x2 >= rectX - rect.w / 2 &&
-        e.x2 <= rectX + rect.w / 2 &&
-        e.y2 >= rectY - rect.h / 2 &&
-        e.y2 <= rectY + rect.h / 2;
+        const isTipInRect =
+          e.x2 >= rectX - rect.w / 2 &&
+          e.x2 <= rectX + rect.w / 2 &&
+          e.y2 >= rectY - rect.h / 2 &&
+          e.y2 <= rectY + rect.h / 2;
 
-      if ((isRootInRect || isTipInRect) && !e.isCut) {
-        e.isCut = true;
-        e.cutProgress = 0;
-        e.fallVelocity = 0;
+        if ((isRootInRect || isTipInRect) && !e.isCut) {
+          e.isCut = true;
+          e.cutProgress = 0;
+          e.fallVelocity = 0;
+        }
       }
-    }
-  });
+    });
+  }
 
   // Update falling hair
   hairPaths.forEach((e) => {
@@ -330,23 +347,28 @@ function update(dt) {
   }
 
   hairPaths.forEach((e) => {
+    // Apply leg offset to hair positions during intro
+    const hairX1 = e.x1 + legOffsetX;
+    const hairX2 = e.x2 + legOffsetX;
+    const hairCx = e.cx + legOffsetX;
+
     ctx.beginPath();
-    ctx.arc(e.x1, e.y1, 3, 0, 2 * Math.PI);
+    ctx.arc(hairX1, e.y1, 3, 0, 2 * Math.PI);
     ctx.fillStyle = "black";
     ctx.fill();
     if (!e.isCut) {
       ctx.beginPath();
-      ctx.moveTo(e.x1, e.y1);
-      ctx.quadraticCurveTo(e.cx, e.cy, e.x2, e.y2);
+      ctx.moveTo(hairX1, e.y1);
+      ctx.quadraticCurveTo(hairCx, e.cy, hairX2, e.y2);
       ctx.stroke();
     } else if (e.cutProgress !== undefined) {
       // Draw falling hair
       ctx.beginPath();
-      ctx.moveTo(e.x1, e.y1 + e.cutProgress);
+      ctx.moveTo(hairX1, e.y1 + e.cutProgress);
       ctx.quadraticCurveTo(
-        e.cx,
+        hairCx,
         e.cy + e.cutProgress,
-        e.x2,
+        hairX2,
         e.y2 + e.cutProgress
       );
       ctx.stroke();
