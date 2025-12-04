@@ -157,7 +157,7 @@ const point = {
 let currentState = State.WaitingForInput;
 let lastPointTime = 0;
 const pointInterval = 0.01; // Add a point every 0.05 seconds while dragging
-const COVERAGE_THRESHOLD = 80; // Percentage needed to complete drawing
+const COVERAGE_THRESHOLD = 75; // Percentage needed to complete drawing
 let drawingDone = false;
 let waitBeforOutro = 2.0; // Wait time in seconds before transitioning to outro
 let outroWaitProgress = 0;
@@ -439,14 +439,11 @@ function updateTempPoints(dt) {
 function drawPoints() {
   ctx.save();
 
-  // Calculate shoulder offset for outro animation
-  const shoulderOffsetX = shoulder.x - shoulder.targetX;
-
   // Draw permanent points
   ctx.fillStyle = "black";
   points.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(p.x + shoulderOffsetX, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   });
 
@@ -455,7 +452,7 @@ function drawPoints() {
     const fade = 1 - p.lifetime / p.maxLifetime;
     ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
     ctx.beginPath();
-    ctx.arc(p.x + shoulderOffsetX, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   });
 

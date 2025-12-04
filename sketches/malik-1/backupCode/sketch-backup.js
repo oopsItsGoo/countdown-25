@@ -77,26 +77,12 @@ function createIsPointInOneFunction() {
   oneCtx.drawImage(oneSVG, one.x, one.y, one.width, one.height);
   const imageData = oneCtx.getImageData(0, 0, canvas.width, canvas.height);
 
-  mask.data = imageData;
-  mask.covered = new Uint8Array((imageData.data.length / 4) | 0);
-  mask.totalPixels = 0;
-  mask.coveredCount = 0;
-
-  // Count mask pixels once so we don't recompute every frame
-  const data = imageData.data;
-  for (let i = 3; i < data.length; i += 4) {
-    if (data[i] > 128) mask.totalPixels++;
-  }
-
   // Check if point is inside the "1" shape
   window.isPointInOne = (x, y) => {
-    if (!mask.ready) return false;
     if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return false;
     const index = (Math.floor(y) * canvas.width + Math.floor(x)) * 4;
-    return mask.data.data[index + 3] > 128;
+    return imageData.data[index + 3] > 128;
   };
-
-  mask.ready = true;
 }
 
 const gunSVG = new Image();
@@ -139,13 +125,6 @@ gunSVG.onload = () => {
 
 const points = [];
 const tempPoints = [];
-const mask = {
-  data: null,
-  covered: null,
-  totalPixels: 0,
-  coveredCount: 0,
-  ready: false,
-};
 
 const point = {
   x: 0,
@@ -157,7 +136,7 @@ const point = {
 let currentState = State.WaitingForInput;
 let lastPointTime = 0;
 const pointInterval = 0.01; // Add a point every 0.05 seconds while dragging
-const COVERAGE_THRESHOLD = 80; // Percentage needed to complete drawing
+const COVERAGE_THRESHOLD = 75; // Percentage needed to complete drawing
 let drawingDone = false;
 let waitBeforOutro = 2.0; // Wait time in seconds before transitioning to outro
 let outroWaitProgress = 0;
@@ -165,10 +144,9 @@ let outroStarted = false;
 let slideOutDuration = 2.0; // Duration of slide-out animation
 let outroProgress = 0;
 let outroComplete = false;
-let coveragePercentage = 0;
 
 function update(dt) {
-  // console.log(currentState);
+  console.log(currentState);
 
   lastPointTime += dt;
 
@@ -257,6 +235,10 @@ function update(dt) {
 
       // Update temporary points (fade them out)
       updateTempPoints(dt);
+
+      // Calculate and log coverage percentage
+      const coveragePercentage = calculateOneCoverage();
+      console.log(`One coverage: ${coveragePercentage.toFixed(2)}%`);
 
       // Check if coverage threshold is reached
       if (coveragePercentage >= COVERAGE_THRESHOLD) {
@@ -383,7 +365,6 @@ function addPointAtNeedle() {
       y: needleY,
       size: point.size,
     });
-    coveragePercentage = updateCoverageForPoint(needleX, needleY, point.size);
   } else {
     // Add to temporary points array with lifetime
     tempPoints.push({
@@ -394,36 +375,6 @@ function addPointAtNeedle() {
       maxLifetime: point.lifeTime, // Disappear after 3 seconds
     });
   }
-}
-
-function updateCoverageForPoint(cx, cy, radius) {
-  if (!mask.ready || mask.totalPixels === 0) return coveragePercentage;
-
-  const r2 = radius * radius;
-  const minX = Math.max(0, Math.floor(cx - radius));
-  const maxX = Math.min(canvas.width - 1, Math.ceil(cx + radius));
-  const minY = Math.max(0, Math.floor(cy - radius));
-  const maxY = Math.min(canvas.height - 1, Math.ceil(cy + radius));
-
-  for (let y = minY; y <= maxY; y++) {
-    const dy = y + 0.5 - cy;
-    const dy2 = dy * dy;
-    for (let x = minX; x <= maxX; x++) {
-      const dx = x + 0.5 - cx;
-      const dist2 = dx * dx + dy2;
-      if (dist2 > r2) continue;
-
-      const idx = y * canvas.width + x;
-      if (mask.covered[idx]) continue;
-      if (mask.data.data[idx * 4 + 3] <= 128) continue;
-
-      mask.covered[idx] = 1;
-      mask.coveredCount++;
-    }
-  }
-
-  if (mask.totalPixels === 0) return 0;
-  return (mask.coveredCount / mask.totalPixels) * 100;
 }
 
 function updateTempPoints(dt) {
@@ -439,14 +390,11 @@ function updateTempPoints(dt) {
 function drawPoints() {
   ctx.save();
 
-  // Calculate shoulder offset for outro animation
-  const shoulderOffsetX = shoulder.x - shoulder.targetX;
-
   // Draw permanent points
   ctx.fillStyle = "black";
   points.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(p.x + shoulderOffsetX, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   });
 
@@ -455,11 +403,70 @@ function drawPoints() {
     const fade = 1 - p.lifetime / p.maxLifetime;
     ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
     ctx.beginPath();
-    ctx.arc(p.x + shoulderOffsetX, p.y, p.size, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
     ctx.fill();
   });
 
   ctx.restore();
+}
+
+function calculateOneCoverage() {
+  if (!window.isPointInOne || points.length === 0) return 0;
+
+  // Create a canvas to draw the points
+  const pointsCanvas = document.createElement("canvas");
+  pointsCanvas.width = canvas.width;
+  pointsCanvas.height = canvas.height;
+  const pointsCtx = pointsCanvas.getContext("2d");
+
+  // Draw all points with their size
+  pointsCtx.fillStyle = "black";
+  points.forEach((p) => {
+    pointsCtx.beginPath();
+    pointsCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    pointsCtx.fill();
+  });
+
+  const pointsImageData = pointsCtx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  // Create a canvas for the one mask
+  const oneCanvas = document.createElement("canvas");
+  oneCanvas.width = canvas.width;
+  oneCanvas.height = canvas.height;
+  const oneCtx = oneCanvas.getContext("2d");
+  oneCtx.drawImage(oneSVG, one.x, one.y, one.width, one.height);
+  const oneImageData = oneCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let totalOnePixels = 0;
+  let coveredOnePixels = 0;
+
+  // Check each pixel
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const index = (y * canvas.width + x) * 4;
+      const oneAlpha = oneImageData.data[index + 3];
+      const pointsAlpha = pointsImageData.data[index + 3];
+
+      // If the one mask has a visible pixel at this position
+      if (oneAlpha > 128) {
+        totalOnePixels++;
+
+        // If there's also a point at this position
+        if (pointsAlpha > 128) {
+          coveredOnePixels++;
+        }
+      }
+    }
+  }
+
+  // Calculate percentage
+  if (totalOnePixels === 0) return 0;
+  return (coveredOnePixels / totalOnePixels) * 100;
 }
 
 function drawObject(obj) {
