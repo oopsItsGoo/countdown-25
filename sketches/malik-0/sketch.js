@@ -15,13 +15,14 @@ let currentState = State.WaitingForInput;
 
 const stars = [];
 const starCount = 5;
-const starY = canvas.height * 0.23; // Center vertical position
+const reviewSizeRatio = 0.15;
+const starY = canvas.height * 0.6; // Center vertical position
+const rateY = canvas.height * 0.69; // Center vertical position
 let starsLoaded = 0;
-const starAcceleration = 10;
-const rotationSpeed = 0.5;
+let rateButtonClicked = false;
 
 const reviewSVG = new Image();
-reviewSVG.src = "/sketches/malik-0/review.svg";
+reviewSVG.src = "/sketches/malik-0/review-02.svg";
 const review = {
   svg: reviewSVG,
   x: 0,
@@ -35,9 +36,104 @@ const review = {
   loaded: false,
 };
 
+// Load star SVGs (outline and filled)
+const starOutlinedSVG = new Image();
+starOutlinedSVG.src = "/sketches/malik-0/star.svg";
+
+const starFilledSVG = new Image();
+starFilledSVG.src = "/sketches/malik-0/star-filled.svg";
+
+let starSVGsLoaded = 0;
+starOutlinedSVG.onload = () => {
+  starSVGsLoaded++;
+  checkStarSVGsLoaded();
+};
+
+starFilledSVG.onload = () => {
+  starSVGsLoaded++;
+  checkStarSVGsLoaded();
+};
+
+// Load rate button SVG
+const rateButtonSVG = new Image();
+rateButtonSVG.src = "/sketches/malik-0/rate-button.svg";
+const rate = {
+  svg: rateButtonSVG,
+  x: 0,
+  y: 0,
+  ratio: 0,
+  width: 0,
+  height: 0,
+  loaded: false,
+};
+
+rateButtonSVG.onload = () => {
+  rate.loaded = true;
+  rate.ratio = rateButtonSVG.naturalWidth / rateButtonSVG.naturalHeight;
+  rate.height = review.height * reviewSizeRatio;
+  rate.width = rate.height * rate.ratio;
+  rate.x = canvas.width / 2 - rate.width / 2;
+  rate.y = rateY;
+};
+// Load zero and fife (large artwork) SVGs
+const zeroSVG = new Image();
+zeroSVG.src = "/sketches/malik-0/zero.svg";
+const zero = {
+  svg: zeroSVG,
+  x: 0,
+  y: 0,
+  ratio: 0,
+  width: 0,
+  height: 0,
+  loaded: false,
+};
+
+const fifeSVG = new Image();
+fifeSVG.src = "/sketches/malik-0/fife.svg";
+const fife = {
+  svg: fifeSVG,
+  x: 0,
+  y: 0,
+  ratio: 0,
+  width: 0,
+  height: 0,
+  loaded: false,
+};
+
+// Spring for zero scale animation
+const zeroSpring = new Spring({
+  frequency: 2.5,
+  halfLife: 0.1,
+  position: 0,
+  velocity: 0,
+  target: 1,
+});
+let zeroSpringStarted = false;
+
+zeroSVG.onload = () => {
+  zero.loaded = true;
+  zero.ratio = zeroSVG.naturalWidth / zeroSVG.naturalHeight;
+  zero.height = canvas.height * 0.5;
+  zero.width = zero.height * zero.ratio;
+  zero.x = canvas.width / 2 - zero.width / 2;
+  zero.y = canvas.height / 2 - zero.height / 2;
+};
+
+fifeSVG.onload = () => {
+  fife.loaded = true;
+  fife.ratio = fifeSVG.naturalWidth / fifeSVG.naturalHeight;
+  fife.height = canvas.height * 0.1;
+  fife.width = fife.height * fife.ratio;
+  // Position fife below and to the right of zero
+  if (zero.loaded) {
+    fife.x = zero.x + zero.width - fife.width / 2;
+    fife.y = zero.y + zero.height - fife.height;
+  }
+};
+
 reviewSVG.onload = () => {
   review.ratio = reviewSVG.width / reviewSVG.height;
-  review.height = canvas.height;
+  review.height = canvas.height * 0.6;
   review.width = review.height * review.ratio;
   review.x = canvas.width / 2 - review.width / 2;
   review.y = canvas.height / 2 - review.height / 2;
@@ -45,46 +141,47 @@ reviewSVG.onload = () => {
   review.targetY = review.y;
   review.loaded = true;
 
-  // Load stars after review is loaded
-  for (let i = 0; i < starCount; i++) {
-    const starSVG = new Image();
-    starSVG.src = `/sketches/malik-0/star-0${i + 1}.svg`;
-    starSVG.onload = () => {
-      const ratio = starSVG.naturalWidth / starSVG.naturalHeight;
-      const height = review.height * 0.15;
-      const width = height * ratio;
-      const spacing = review.width / (starCount + 2);
+  checkStarSVGsLoaded();
+};
 
+function checkStarSVGsLoaded() {
+  if (review.loaded && starSVGsLoaded === 2) {
+    // Create stars after review and star SVGs are loaded
+    const ratio = starOutlinedSVG.naturalWidth / starOutlinedSVG.naturalHeight;
+    const height = review.height * reviewSizeRatio;
+    const width = height * ratio;
+
+    // Calculate spacing to fit stars inside the review rectangle
+    const totalStarsWidth = width * starCount;
+    const availableSpace = review.width - totalStarsWidth;
+    const spacing = availableSpace / (starCount + 1);
+
+    for (let i = 0; i < starCount; i++) {
       const star = {
-        svg: starSVG,
-        x: spacing * (i + 2) + review.x,
+        svg_outlined: starOutlinedSVG,
+        svg_filled: starFilledSVG,
+        x: review.x + spacing * (i + 1) + width * (i + 0.5),
         y: starY,
         height: height,
         width: width,
         ratio: ratio,
-        velocity: 0,
-        acceleration: starAcceleration,
-        clicked: false,
-        rotation: 0,
+        clicked: i < 3, // Stars 0, 1, 2 (first 3) start clicked
       };
       stars.push(star);
+    }
 
-      starsLoaded++;
-      if (starsLoaded === starCount) {
-        run(update);
-      }
-    };
+    run(update);
   }
-};
+}
 
 function drawStar(star) {
   ctx.save();
   ctx.translate(star.x, star.y);
-  ctx.rotate(star.rotation);
 
-  // Draw the star SVG centered at the current position
+  // Draw the appropriate star SVG (outlined or filled) centered at the current position
+  const svgToUse = star.clicked ? star.svg_filled : star.svg_outlined;
   ctx.drawImage(
-    star.svg,
+    svgToUse,
     -star.width / 2,
     -star.height / 2,
     star.width,
@@ -92,10 +189,10 @@ function drawStar(star) {
   );
 
   //TODO DEBUG
-  ctx.rect(-star.width / 2, -star.height / 2, star.width, star.height);
-  ctx.strokeStyle = "#00FF00";
-  ctx.lineWidth = 5;
-  ctx.stroke();
+  // ctx.rect(-star.width / 2, -star.height / 2, star.width, star.height);
+  // ctx.strokeStyle = "#00FF00";
+  // ctx.lineWidth = 5;
+  // ctx.stroke();
 
   ctx.restore();
 }
@@ -103,50 +200,100 @@ function drawStar(star) {
 function drawReview() {
   ctx.save();
   ctx.drawImage(review.svg, review.x, review.y, review.width, review.height);
-  ctx.rect(review.x, review.y, review.width, review.height);
-  ctx.strokeStyle = "#FF0000";
-  ctx.lineWidth = 10;
-  ctx.stroke();
+  // ctx.rect(review.x, review.y, review.width, review.height);
+  // ctx.strokeStyle = "#FF0000";
+  // ctx.lineWidth = 10;
+  // ctx.stroke();
   ctx.restore();
 }
 
-function checkStarsClicked(event) {
+function drawRate() {
+  if (!rate.loaded) return;
+  ctx.save();
+
+  // Check if all stars are unclicked (button is clickable)
+  const allStarsUnclicked = stars.every((star) => !star.clicked);
+
+  // Set opacity based on clickability
+  ctx.globalAlpha = allStarsUnclicked ? 1.0 : 0.8;
+
+  ctx.drawImage(rate.svg, rate.x, rate.y, rate.width, rate.height);
+  ctx.restore();
+}
+
+function drawZero() {
+  if (!zero.loaded) return;
+  ctx.save();
+
+  // Use spring position as scale (starts at 0.1, overshoots past 1, settles at 1)
+  const scale = zeroSpring.position;
+
+  // Translate to center, scale, then draw centered
+  const centerX = zero.x + zero.width / 2;
+  const centerY = zero.y + zero.height / 2;
+  ctx.translate(centerX, centerY);
+  ctx.scale(scale, scale);
+  ctx.drawImage(
+    zero.svg,
+    -zero.width / 2,
+    -zero.height / 2,
+    zero.width,
+    zero.height
+  );
+  // ctx.rect(-zero.width / 2, -zero.height / 2, zero.width, zero.height);
+  // ctx.strokeStyle = "#00FF00";
+  // ctx.lineWidth = 5;
+  // ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawFife() {
+  if (!fife.loaded) return;
+  ctx.save();
+  ctx.drawImage(fife.svg, fife.x, fife.y, fife.width, fife.height);
+  ctx.restore();
+}
+
+function mouseClicked(event) {
   const mouseX = input.getX();
   const mouseY = input.getY();
 
+  // Check rate button click first
+  if (rate.loaded) {
+    const allStarsUnclicked = stars.every((star) => !star.clicked);
+
+    if (
+      allStarsUnclicked &&
+      mouseX >= rate.x &&
+      mouseX <= rate.x + rate.width &&
+      mouseY >= rate.y &&
+      mouseY <= rate.y + rate.height
+    ) {
+      console.log("Rate button clicked!");
+      rateButtonClicked = true;
+      return; // Exit early to prevent star clicks
+    }
+  }
+
+  // Check star clicks
   stars.forEach((star) => {
     const halfWidth = star.width / 2;
     const halfHeight = star.height / 2;
 
     if (
-      !star.clicked &&
       mouseX >= star.x - halfWidth &&
       mouseX <= star.x + halfWidth &&
       mouseY >= star.y - halfHeight &&
       mouseY <= star.y + halfHeight
     ) {
       console.log("Star clicked!", star);
-      star.clicked = true;
+      star.clicked = !star.clicked; // Toggle the clicked state
     }
   });
 }
-
-function updateStars(dt) {
-  for (let i = stars.length - 1; i >= 0; i--) {
-    const star = stars[i];
-    if (star.clicked) {
-      star.velocity += star.acceleration * dt;
-      star.y += star.velocity;
-      star.rotation += rotationSpeed * dt;
-
-      // Remove star if it falls below the canvas
-      if (star.y - star.height / 2 > canvas.height) {
-        stars.splice(i, 1);
-      }
-    }
-  }
-}
-
+// Register click handler once
+window.addEventListener("click", mouseClicked);
 function update(dt) {
   let nextState = undefined;
   switch (currentState) {
@@ -157,10 +304,12 @@ function update(dt) {
       nextState = State.Reviewing;
       break;
     case State.Reviewing:
-      //nextState = State.Outro;
+      if (rateButtonClicked) {
+        nextState = State.Outro;
+      }
       break;
     case State.Outro:
-      nextState = State.Finished;
+      //nextState = State.Finished;
       break;
     case State.Finished:
       break;
@@ -169,6 +318,7 @@ function update(dt) {
   if (nextState) {
     currentState = nextState;
   }
+
   switch (currentState) {
     case State.WaitingForInput:
       if (input.hasStarted()) {
@@ -178,19 +328,30 @@ function update(dt) {
     case State.Intro:
       break;
     case State.Reviewing:
-      window.addEventListener("click", checkStarsClicked);
-      updateStars(dt);
+      drawReview();
+      // Draw all stars
+      stars.forEach((star) => {
+        drawStar(star);
+      });
+      drawRate();
       break;
     case State.Outro:
+      // Initialize spring on first frame of outro
+      if (!zeroSpringStarted) {
+        zeroSpringStarted = true;
+        zeroSpring.position = 0.1; // Start very small
+        zeroSpring.velocity = 0;
+        zeroSpring.target = 1; // Target normal scale
+      }
+
+      // Step the spring animation
+      zeroSpring.step(dt);
+
+      drawZero();
+      drawFife();
       break;
     case State.Finished:
       finish();
       break;
   }
-
-  //drawReview();
-  // Draw all stars
-  stars.forEach((star) => {
-    drawStar(star);
-  });
 }
