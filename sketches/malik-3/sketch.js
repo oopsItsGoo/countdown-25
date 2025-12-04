@@ -69,7 +69,7 @@ let threeMaskYFrac = 0.5;
 let threeMaskRect = { x: 0, y: 0, w: 0, h: 0 };
 
 const threeMaskSVG = new Image();
-threeMaskSVG.src = "/Assets/SVG/3-mask.svg";
+threeMaskSVG.src = "/sketches/malik-3/3-mask.svg";
 let maskLoaded = false;
 let showMaskDebug = false; //DEBUG
 
@@ -80,7 +80,7 @@ threeMaskSVG.onload = () => {
 
 // load razorSVG as image
 const razorSVG = new Image();
-razorSVG.src = "/Assets/SVG/razor.svg";
+razorSVG.src = "/sketches/malik-3/razor.svg";
 let razorLoaded = false;
 
 razorSVG.onload = () => {
@@ -93,7 +93,7 @@ razorSVG.onload = () => {
 // load legSVG as image
 const legSVG = new Image();
 legSVG.height = canvas.height;
-legSVG.src = "/Assets/SVG/Leg-corner.svg";
+legSVG.src = "/sketches/malik-3/Leg-corner.svg";
 let svgLoaded = false;
 
 legSVG.onload = () => {

@@ -79,7 +79,7 @@ const tattooDesign_01 = {
   onSkin: false,
 };
 
-loadTattooDesign(tattooDesign_01, "/Assets/SVG/tattoo-design-01.svg");
+loadTattooDesign(tattooDesign_01, "/sketches/malik-2/tattoo-design-01.svg");
 
 const tattooDesign_02 = {
   x: 0,
@@ -90,7 +90,7 @@ const tattooDesign_02 = {
   onSkin: false,
 };
 
-loadTattooDesign(tattooDesign_02, "/Assets/SVG/tattoo-design-02.svg");
+loadTattooDesign(tattooDesign_02, "/sketches/malik-2/tattoo-design-02.svg");
 
 const tattooDesign_03 = {
   x: 0,
@@ -101,7 +101,7 @@ const tattooDesign_03 = {
   onSkin: false,
 };
 
-loadTattooDesign(tattooDesign_03, "/Assets/SVG/tattoo-design-03.svg");
+loadTattooDesign(tattooDesign_03, "/sketches/malik-2/tattoo-design-03.svg");
 
 // Array to store all placed designs for each state
 let placedDesigns = {
@@ -113,7 +113,7 @@ let placedDesigns = {
 
 // load back svg
 const backSVG = new Image();
-backSVG.src = "/Assets/SVG/back.svg";
+backSVG.src = "/sketches/malik-2/back.svg";
 back.loaded = false;
 backSVG.onload = () => {
   back.loaded = true;
@@ -131,7 +131,7 @@ backSVG.onload = () => {
 
 //load paper svg
 const paperSVG = new Image();
-paperSVG.src = "/Assets/SVG/paper.svg";
+paperSVG.src = "/sketches/malik-2/paper.svg";
 paper.loaded = false;
 paperSVG.onload = () => {
   paper.loaded = true;
@@ -160,7 +160,7 @@ paperSVG.onload = () => {
 
 //load 2 svg
 const twoSVG = new Image();
-twoSVG.src = "/Assets/SVG/2.svg";
+twoSVG.src = "/sketches/malik-2/2.svg";
 two.loaded = false;
 twoSVG.onload = () => {
   two.loaded = true;

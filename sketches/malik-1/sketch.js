@@ -19,7 +19,7 @@ const State = {
 };
 
 const shoulderSVG = new Image();
-shoulderSVG.src = "/Assets/SVG/shoulder.svg";
+shoulderSVG.src = "/sketches/malik-1/shoulder.svg";
 const shoulder = {
   x: 0,
   y: 0,
@@ -43,7 +43,7 @@ shoulderSVG.onload = () => {
 };
 
 const oneSVG = new Image();
-oneSVG.src = "/Assets/SVG/1-mask.svg";
+oneSVG.src = "/sketches/malik-1/1-mask.svg";
 const one = {
   x: 0,
   y: 0,
@@ -86,7 +86,7 @@ function createIsPointInOneFunction() {
 }
 
 const gunSVG = new Image();
-gunSVG.src = "/Assets/SVG/tattoo-gun.svg";
+gunSVG.src = "/sketches/malik-1/tattoo-gun.svg";
 const gun = {
   x: 0,
   y: 0,
