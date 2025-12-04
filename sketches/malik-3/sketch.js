@@ -92,12 +92,27 @@ razorSVG.onload = () => {
 
 // load legSVG as image
 const legSVG = new Image();
-legSVG.height = canvas.height;
 legSVG.src = "/sketches/malik-3/Leg-corner.svg";
 let svgLoaded = false;
 
+const leg = {
+  svg: null,
+  x: 0,
+  y: 0,
+  width: 0,
+  height: 0,
+  ratio: 0,
+};
+
 legSVG.onload = () => {
   svgLoaded = true;
+  leg.svg = legSVG;
+  leg.ratio = legSVG.naturalHeight / legSVG.naturalWidth;
+  leg.height = canvas.height;
+  leg.width = leg.height / leg.ratio;
+  leg.x = canvas.width / 2 - leg.width / 2;
+  leg.y = canvas.height / 2 - leg.height / 2;
+
   threeMaskAspect = threeMaskSVG.naturalWidth / threeMaskSVG.naturalHeight;
   updateThreeMaskLayout();
   checkIfReady();
@@ -168,7 +183,7 @@ function createisPointInLegFunction() {
   const legCtx = legCanvas.getContext("2d");
 
   // Draw the SVG image to extract the shape
-  legCtx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
+  legCtx.drawImage(leg.svg, leg.x, leg.y, leg.width, leg.height);
 
   // Store the image data for pixel-based collision detection
   const imageData = legCtx.getImageData(0, 0, canvas.width, canvas.height);
@@ -352,7 +367,7 @@ function update(dt) {
   // Draw leg with intro offset
   ctx.save();
   ctx.translate(legOffsetX, 0);
-  ctx.drawImage(legSVG, 0, 0, canvas.width, canvas.height);
+  ctx.drawImage(leg.svg, leg.x, leg.y, leg.width, leg.height);
   ctx.restore();
 
   switch (currentState) {

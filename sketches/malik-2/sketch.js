@@ -458,10 +458,9 @@ function updatePaper() {
         activeDesign.y = paper.y;
       }
 
-      // Don't allow state transition
-      paper.goToOriginal = false;
-      paper.x = paper.originalX;
-      paper.y = paper.originalY;
+      // Don't allow state transition - but still smoothly return to original
+      paper.goToOriginal = true;
+      paper.hasReturned = false; // Ensure this doesn't trigger state change
     }
   }
 
@@ -476,7 +475,15 @@ function updatePaper() {
       paper.goToOriginal = false;
       paper.x = paper.originalX;
       paper.y = paper.originalY;
-      paper.hasReturned = true;
+
+      // Only set hasReturned if the active design is successfully on skin
+      if (
+        activeDesign &&
+        activeDesign.onSkin &&
+        calculateVisiblePercentage(activeDesign) >= VISIBILITY_THRESHOLD
+      ) {
+        paper.hasReturned = true;
+      }
     }
   }
 

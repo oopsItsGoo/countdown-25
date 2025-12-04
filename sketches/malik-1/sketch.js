@@ -151,7 +151,7 @@ const point = {
   x: 0,
   y: 0,
   size: 8,
-  lifeTime: 3.0, // seconds
+  lifeTime: 0.5, // seconds
 };
 
 let currentState = State.WaitingForInput;
@@ -347,8 +347,8 @@ function handleGunPickup() {
     gun.width = gun.height / gun.ratio;
 
     // Store offset from mouse to gun position
-    gun.offsetX = mouseX - gun.x;
-    gun.offsetY = mouseY - gun.y;
+    gun.offsetX = gun.width / 4;
+    gun.offsetY = (3 * gun.height) / 4;
   }
 }
 
