@@ -13,6 +13,7 @@ const State = {
   WaitingForInput: "waitingForInput",
   Intro: "intro",
   Drawing: "drawing",
+  Done: "done",
   Outro: "outro",
   Finished: "finished",
 };
@@ -93,6 +94,8 @@ const gun = {
   height: 0,
   targetX: 0,
   targetY: 0,
+  initialX: 0, // Store initial position
+  initialY: 0,
   isAnimating: false,
   isPickedUp: false,
   isHovered: false,
@@ -109,11 +112,13 @@ gunSVG.onload = () => {
   gun.width = gun.height / gun.ratio;
   gun.targetX = canvas.width * 0.85 - gun.width / 2;
   gun.targetY = canvas.height * 0.33 - gun.height / 2;
+  gun.initialX = gun.targetX; // Save initial position
+  gun.initialY = gun.targetY;
   // Start off-screen at the bottom
   gun.x = gun.targetX;
   gun.y = canvas.height + gun.height;
   gun.needlePosition = {
-    x: gun.x + gun.width / 2,
+    x: gun.x,
     y: gun.y + gun.height,
   };
 };
@@ -124,12 +129,21 @@ const tempPoints = [];
 const point = {
   x: 0,
   y: 0,
-  size: 5,
+  size: 8,
+  lifeTime: 3.0, // seconds
 };
 
 let currentState = State.WaitingForInput;
 let lastPointTime = 0;
 const pointInterval = 0.01; // Add a point every 0.05 seconds while dragging
+const COVERAGE_THRESHOLD = 75; // Percentage needed to complete drawing
+let drawingDone = false;
+let waitBeforOutro = 2.0; // Wait time in seconds before transitioning to outro
+let outroWaitProgress = 0;
+let outroStarted = false;
+let slideOutDuration = 2.0; // Duration of slide-out animation
+let outroProgress = 0;
+let outroComplete = false;
 
 function update(dt) {
   console.log(currentState);
@@ -137,7 +151,8 @@ function update(dt) {
   lastPointTime += dt;
 
   drawObject(shoulder);
-  drawObject(one);
+
+  //drawObject(one);
   drawPoints();
   drawObject(gun);
   DEBUGDrawGunRectangle();
@@ -157,8 +172,19 @@ function update(dt) {
       }
       break;
     case State.Drawing:
+      if (drawingDone) {
+        nextState = State.Done;
+      }
+      break;
+    case State.Done:
+      if (outroStarted) {
+        nextState = State.Outro;
+      }
       break;
     case State.Outro:
+      if (outroComplete) {
+        nextState = State.Finished;
+      }
       break;
     case State.Finished:
       break;
@@ -196,10 +222,10 @@ function update(dt) {
       break;
     case State.Drawing:
       handleGunPickup();
-      
+
       if (gun.isPickedUp) {
         updateGun();
-        
+
         // Only add points when clicking/holding after pickup
         if (input.isPressed() && lastPointTime >= pointInterval) {
           addPointAtNeedle();
@@ -209,10 +235,70 @@ function update(dt) {
 
       // Update temporary points (fade them out)
       updateTempPoints(dt);
+
+      // Calculate and log coverage percentage
+      const coveragePercentage = calculateOneCoverage();
+      console.log(`One coverage: ${coveragePercentage.toFixed(2)}%`);
+
+      // Check if coverage threshold is reached
+      if (coveragePercentage >= COVERAGE_THRESHOLD) {
+        drawingDone = true;
+      }
+      break;
+    case State.Done:
+      // Smoothly return gun to initial position
+      gun.x = math.lerp(gun.x, gun.initialX, 0.05);
+      gun.y = math.lerp(gun.y, gun.initialY, 0.05);
+
+      // Update needle position
+      gun.needlePosition.x = gun.x + gun.width / 2;
+      gun.needlePosition.y = gun.y + gun.height;
+
+      // Check if gun has returned to initial position
+      const gunReturnDistance = math.dist(
+        gun.x,
+        gun.y,
+        gun.initialX,
+        gun.initialY
+      );
+
+      if (gunReturnDistance < 5) {
+        // Gun is back at initial position, start waiting
+        if (!outroStarted) {
+          outroWaitProgress += dt / waitBeforOutro;
+
+          if (outroWaitProgress >= 1) {
+            outroWaitProgress = 1;
+            outroStarted = true;
+          }
+        }
+      }
       break;
     case State.Outro:
+      // Update outro animation
+      if (!outroComplete) {
+        outroProgress += dt / slideOutDuration;
+        if (outroProgress >= 1) {
+          outroProgress = 1;
+          outroComplete = true;
+        }
+
+        // Easing function for smooth outro (smoothstep)
+        const ease = outroProgress * outroProgress * (3 - 2 * outroProgress);
+
+        // Slide shoulder out to the right
+        const shoulderTargetX = canvas.width + shoulder.width;
+        shoulder.x =
+          shoulder.targetX + (shoulderTargetX - shoulder.targetX) * ease;
+
+        // Slide gun out to the right
+        const gunTargetX = canvas.width + gun.width;
+        gun.x = gun.initialX + (gunTargetX - gun.initialX) * ease;
+      }
       break;
     case State.Finished:
+      console.log("FINISHED");
+      finish();
       break;
   }
 }
@@ -229,14 +315,19 @@ function handleGunPickup() {
     mouseY <= gun.y + gun.height;
 
   // Handle pickup - click on gun to pick it up
-  if (input.isPressed() && !gun.isPickedUp && gun.isHovered && currentState === State.Drawing) {
+  if (
+    input.isPressed() &&
+    !gun.isPickedUp &&
+    gun.isHovered &&
+    currentState === State.Drawing
+  ) {
     gun.isPickedUp = true;
     gun.scale = 0.3; // Increase size when picked up
-    
+
     // Recalculate dimensions with new scale
     gun.height = canvas.height * gun.scale;
     gun.width = gun.height / gun.ratio;
-    
+
     // Store offset from mouse to gun position
     gun.offsetX = mouseX - gun.x;
     gun.offsetY = mouseY - gun.y;
@@ -245,7 +336,7 @@ function handleGunPickup() {
 
 function updateGun() {
   if (!gun.isPickedUp) return;
-  
+
   const mouseX = input.getX();
   const mouseY = input.getY();
 
@@ -272,16 +363,16 @@ function addPointAtNeedle() {
     points.push({
       x: needleX,
       y: needleY,
-      size: 5,
+      size: point.size,
     });
   } else {
     // Add to temporary points array with lifetime
     tempPoints.push({
       x: needleX,
       y: needleY,
-      size: 5,
+      size: point.size,
       lifetime: 0,
-      maxLifetime: 3.0, // Disappear after 3 seconds
+      maxLifetime: point.lifeTime, // Disappear after 3 seconds
     });
   }
 }
@@ -317,6 +408,65 @@ function drawPoints() {
   });
 
   ctx.restore();
+}
+
+function calculateOneCoverage() {
+  if (!window.isPointInOne || points.length === 0) return 0;
+
+  // Create a canvas to draw the points
+  const pointsCanvas = document.createElement("canvas");
+  pointsCanvas.width = canvas.width;
+  pointsCanvas.height = canvas.height;
+  const pointsCtx = pointsCanvas.getContext("2d");
+
+  // Draw all points with their size
+  pointsCtx.fillStyle = "black";
+  points.forEach((p) => {
+    pointsCtx.beginPath();
+    pointsCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    pointsCtx.fill();
+  });
+
+  const pointsImageData = pointsCtx.getImageData(
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
+
+  // Create a canvas for the one mask
+  const oneCanvas = document.createElement("canvas");
+  oneCanvas.width = canvas.width;
+  oneCanvas.height = canvas.height;
+  const oneCtx = oneCanvas.getContext("2d");
+  oneCtx.drawImage(oneSVG, one.x, one.y, one.width, one.height);
+  const oneImageData = oneCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+  let totalOnePixels = 0;
+  let coveredOnePixels = 0;
+
+  // Check each pixel
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const index = (y * canvas.width + x) * 4;
+      const oneAlpha = oneImageData.data[index + 3];
+      const pointsAlpha = pointsImageData.data[index + 3];
+
+      // If the one mask has a visible pixel at this position
+      if (oneAlpha > 128) {
+        totalOnePixels++;
+
+        // If there's also a point at this position
+        if (pointsAlpha > 128) {
+          coveredOnePixels++;
+        }
+      }
+    }
+  }
+
+  // Calculate percentage
+  if (totalOnePixels === 0) return 0;
+  return (coveredOnePixels / totalOnePixels) * 100;
 }
 
 function drawObject(obj) {
