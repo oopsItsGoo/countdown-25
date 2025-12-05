@@ -20,6 +20,7 @@ const maxHairLength = 80;
 const minHairLength = 50;
 const minHairSpacing = 8; // Minimum distance between hair roots
 const hairPaths = [];
+const cutHairRoots = []; // Store positions of cut hair roots permanently
 
 // rectangle parameters
 const rect = {
@@ -502,6 +503,9 @@ function update(dt) {
           e.cutProgress = 0;
           e.fallVelocity = 0;
 
+          // Store the hair root position permanently
+          cutHairRoots.push({ x: e.x1, y: e.y1 });
+
           // Decrease counter if hair was in mask
           if (e.isInMask) {
             shavedHairsInMaskCount++;
@@ -561,16 +565,27 @@ function update(dt) {
     }
   }
 
+  // Draw permanent cut hair roots first
+  ctx.fillStyle = "black";
+  cutHairRoots.forEach((root) => {
+    ctx.beginPath();
+    ctx.arc(root.x + legOffsetX, root.y, 3, 0, 2 * Math.PI);
+    ctx.fill();
+  });
+
   hairPaths.forEach((e) => {
     // Apply leg offset to hair positions during intro
     const hairX1 = e.x1 + legOffsetX;
     const hairX2 = e.x2 + legOffsetX;
     const hairCx = e.cx + legOffsetX;
 
-    ctx.beginPath();
-    ctx.arc(hairX1, e.y1, 3, 0, 2 * Math.PI);
-    ctx.fillStyle = "black";
-    ctx.fill();
+    // Only draw root point for uncut hair (cut roots are in cutHairRoots array)
+    if (!e.isCut) {
+      ctx.beginPath();
+      ctx.arc(hairX1, e.y1, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = "black";
+      ctx.fill();
+    }
     if (!e.isCut) {
       ctx.beginPath();
       ctx.moveTo(hairX1, e.y1);
