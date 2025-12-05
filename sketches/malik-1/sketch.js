@@ -8,9 +8,14 @@ const { ctx, canvas } = renderer;
 let machineSound = null;
 let machineSoundInstance = null;
 let pickupSound = null;
-audio.load("/sketches/malik-1/machine.wav", { loop: true }).then((sound) => {
-  machineSound = sound;
+machineSound = await audio.load({
+  src: "/sketches/malik-1/machine.wav",
+  loop: true,
 });
+machineSoundInstance = machineSound.play({
+  volume: 0.0,
+});
+
 audio.load("/sketches/malik-1/pickup.wav").then((sound) => {
   pickupSound = sound;
 });
@@ -86,7 +91,7 @@ function createIsPointInOneFunction() {
   oneCtx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw the one mask
-  oneCtx.drawImage(oneSVG, one.x, one.y, one.width, one.height);
+  oneCtx.drawImage(one.svg, one.x, one.y, one.width, one.height);
   const imageData = oneCtx.getImageData(0, 0, canvas.width, canvas.height);
 
   mask.data = imageData;
@@ -169,7 +174,7 @@ const point = {
 let currentState = State.WaitingForInput;
 let lastPointTime = 0;
 const pointInterval = 0.01; // Add a point every 0.05 seconds while dragging
-const COVERAGE_THRESHOLD = 80; // Percentage needed to complete drawing
+const COVERAGE_THRESHOLD = 95; // Percentage needed to complete drawing
 let drawingDone = false;
 let waitBeforOutro = 2.0; // Wait time in seconds before transitioning to outro
 let outroWaitProgress = 0;
@@ -260,15 +265,6 @@ function update(dt) {
       if (gun.isPickedUp) {
         updateGun();
 
-        // Update machine sound volume based on mouse press
-        if (machineSoundInstance) {
-          if (input.isPressed()) {
-            machineSoundInstance.setVolume(1.0);
-          } else {
-            machineSoundInstance.setVolume(0.3);
-          }
-        }
-
         // Only add points when clicking/holding after pickup
         if (input.isPressed() && lastPointTime >= pointInterval) {
           addPointAtNeedle();
@@ -282,10 +278,6 @@ function update(dt) {
       // Check if coverage threshold is reached
       if (coveragePercentage >= COVERAGE_THRESHOLD) {
         drawingDone = true;
-        // Stop machine sound when drawing is complete
-        if (machineSoundInstance) {
-          machineSoundInstance.setVolume(0);
-        }
       }
       break;
     case State.Done:
@@ -344,6 +336,16 @@ function update(dt) {
       finish();
       break;
   }
+
+  let vol = 0;
+  if (!drawingDone && gun.isPickedUp) {
+    if (input.isPressed()) {
+      vol = 1.0;
+    } else {
+      vol = 0.3;
+    }
+  }
+  machineSoundInstance.setVolume(vol);
 }
 
 function handleGunPickup() {
@@ -378,9 +380,6 @@ function handleGunPickup() {
     // Play pickup sound and start machine sound
     if (pickupSound) {
       pickupSound.play();
-    }
-    if (machineSound && !machineSoundInstance) {
-      machineSoundInstance = machineSound.play({ volume: 0.3 });
     }
   }
 }

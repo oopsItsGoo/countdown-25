@@ -44,20 +44,15 @@ const razor = {
   showRazorRectDebug: false, //DEBUG
 };
 
-// Load pickup sound
-let pickupSound = null;
-audio.load("/sketches/malik-3/pickup.wav").then((sound) => {
-  pickupSound = sound;
-});
+// Load pickup sound (two instances to allow overlapping)
+let pickupSound1 = await audio.load("/sketches/malik-3/pickup.wav");
+let pickupSound2 = await audio.load("/sketches/malik-3/pickup.wav");
+let pickupSoundToggle = false;
 
 // Load shave sound
-let shaveSound = null;
+let shaveSound = await audio.load("/sketches/malik-3/shave.wav");
 let lastShaveSoundTime = 0;
 const shaveSoundCooldown = 0.1; // Minimum time between sound plays
-
-audio.load("/sketches/malik-3/shave.wav").then((sound) => {
-  shaveSound = sound;
-});
 
 // Intro animation
 let introProgress = 0;
@@ -273,10 +268,11 @@ function generateRandomHair(numOfHair) {
 }
 
 function initRazor() {
-  razor.x = canvas.width * 0.85;
-  razor.y = canvas.height * 0.5;
-  razor.targetX = razor.x;
-  razor.targetY = razor.y;
+  razor.targetX = canvas.width * 0.85;
+  razor.targetY = canvas.height * 0.5;
+  // Start razor off-screen at the bottom
+  razor.x = razor.targetX;
+  razor.y = canvas.height + razor.height;
 
   // Start intro animation
   introProgress = 0;
@@ -364,7 +360,7 @@ function update(dt) {
   let razorOffsetX = 0;
   let ease = 1;
 
-  if (currentState === State.Intro) {
+  if (currentState === State.WaitingForInput || currentState === State.Intro) {
     // Easing function for smooth intro
     ease = introProgress * introProgress * (3 - 2 * introProgress);
     legOffsetX = (1 - ease) * -canvas.width * 1;
@@ -417,10 +413,14 @@ function update(dt) {
       razor.isDragging = true;
       razor.offsetX = razor.x - mouseX;
       razor.offsetY = razor.y - mouseY;
-      // Play pickup sound
+      // Play pickup sound (alternate between instances)
+      pickupSoundToggle = !pickupSoundToggle;
+      const pickupSound = pickupSoundToggle ? pickupSound1 : pickupSound2;
       if (pickupSound) {
         console.log("PLAY SOUND");
-        pickupSound.play();
+        pickupSound.play({
+          volume: Math.random() * (1.0 - 0.9) + 0.7,
+        });
       }
     }
     if (razor.isDragging) {
@@ -434,6 +434,15 @@ function update(dt) {
   } else {
     if (razor.isDragging) {
       razor.isDragging = false;
+      pickupSoundToggle = !pickupSoundToggle;
+      const pickupSound = pickupSoundToggle ? pickupSound1 : pickupSound2;
+      if (pickupSound) {
+        console.log("PLAY SOUND");
+        pickupSound.play({
+          volume: Math.random() * 0.1 + 0.6,
+          rate: 1 + Math.random() * 1,
+        });
+      }
     }
   }
 
@@ -494,7 +503,10 @@ function update(dt) {
 
           // Play shave sound only if not already playing
           if (shaveSound && !shaveSound.isPlaying()) {
-            const soundInstance = shaveSound.play({ volume: 1.0 });
+            const soundInstance = shaveSound.play({
+              volume: Math.random() * 0.1 + 0.7,
+              rate: 0.9 + Math.random() * 0.15,
+            });
             // Schedule fade out before sound ends (last 0.3 seconds)
             if (soundInstance && shaveSound.buffer) {
               const fadeOutDuration = 0.3;
