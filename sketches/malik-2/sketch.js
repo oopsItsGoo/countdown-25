@@ -136,7 +136,7 @@ backSVG.onload = () => {
   back.svg = backSVG;
   back.ratio = backSVG.naturalHeight / backSVG.naturalWidth;
   back.height = canvas.height * 1.1;
-  back.width = (canvas.height * 1.1) / back.ratio;
+  back.width = back.height / back.ratio;
   back.targetX = canvas.width / 2 - back.width / 2;
   back.targetY = canvas.height / 2 - back.height / 2;
   // Start off-screen to the left
@@ -152,10 +152,10 @@ paper.loaded = false;
 paperSVG.onload = () => {
   paper.loaded = true;
   paper.svg = paperSVG;
-  paper.width = paperSVG.width;
-  paper.height = paperSVG.height;
-  paper.opacity = 0.9;
   paper.ratio = paperSVG.naturalHeight / paperSVG.naturalWidth;
+  paper.height = canvas.height * 0.3;
+  paper.width = paper.height / paper.ratio;
+  paper.opacity = 0.9;
   console.log("paper loaded:", paper.width, paper.height, paper.x, paper.y);
   paper.targetX = canvas.width * 0.85;
   paper.targetY = canvas.height * 0.33;
@@ -198,11 +198,26 @@ function checkIfReady() {
     console.log("All SVGs loaded:");
     two.height = paper.height * stencilRatio;
     two.width = two.height / two.ratio;
+
+    // Place paper at back.x + back.width
+    paper.x = back.x + back.width;
+    paper.originalX = paper.targetX;
+    paper.originalY = paper.targetY;
+
     run(update);
   }
 }
 
 function update(dt) {
+  console.log(
+    "Paper X Y originalX original Y Target X Target Y",
+    paper.x,
+    paper.y,
+    paper.originalX,
+    paper.originalY,
+    paper.targetX,
+    paper.targetY
+  );
   let nextState = undefined;
   switch (currentState) {
     case State.WaitingForInput: {
