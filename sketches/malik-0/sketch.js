@@ -1,7 +1,7 @@
 import { createEngine } from "../_shared/engine.js";
 import { createSpringSettings, Spring } from "../_shared/spring.js";
 
-const { renderer, input, math, run, finish } = createEngine();
+const { renderer, input, audio, math, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
 
 const State = {
@@ -12,6 +12,22 @@ const State = {
   Finished: "finished",
 };
 let currentState = State.WaitingForInput;
+
+const starsSuccess = await audio.load({
+  src: "/sketches/malik-0/stars-success.wav",
+});
+const starPositive = await audio.load({
+  src: "/sketches/malik-0/star-positive.wav",
+});
+const starNegative = await audio.load({
+  src: "/sketches/malik-0/star-negative.wav",
+});
+const buttonError = await audio.load({
+  src: "/sketches/malik-0/button-error.wav",
+});
+const buttonSuccess = await audio.load({
+  src: "/sketches/malik-0/button-success.wav",
+});
 
 const stars = [];
 const starCount = 5;
@@ -210,6 +226,7 @@ function drawReview() {
 }
 
 function shakeRateButton() {
+  buttonError.play();
   rate.isShaking = true;
   rate.shakeProgress = 0;
 }
@@ -295,6 +312,7 @@ function mouseClicked(event) {
       if (allStarsUnclicked) {
         console.log("Rate button clicked!");
         rateButtonClicked = true;
+        buttonSuccess.play();
         return; // Exit early to prevent star clicks
       } else {
         shakeRateButton();
@@ -315,6 +333,16 @@ function mouseClicked(event) {
     ) {
       console.log("Star clicked!", star);
       star.clicked = !star.clicked; // Toggle the clicked state
+      const allStarsUnclicked = stars.every((star) => !star.clicked);
+      if (allStarsUnclicked) {
+        starsSuccess.play();
+      } else {
+        if (!star.clicked) {
+          starPositive.play();
+        } else {
+          starNegative.play();
+        }
+      }
     }
   });
 }
