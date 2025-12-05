@@ -57,6 +57,7 @@ shoulderSVG.onload = () => {
   // Start off-screen to the left
   shoulder.x = -shoulder.width;
   shoulder.y = shoulder.targetY;
+  checkIfReady();
 };
 
 const oneSVG = new Image();
@@ -74,20 +75,41 @@ oneSVG.onload = () => {
   one.loaded = true;
   one.svg = oneSVG;
   one.ratio = oneSVG.naturalHeight / oneSVG.naturalWidth;
-  one.height = shoulder.height * 0.3;
-  one.width = one.height / one.ratio;
-  one.targetX = canvas.width / 2 - one.width / 2;
-  one.targetY = canvas.height / 2 - one.height / 2;
-  one.x = one.targetX;
-  one.y = one.targetY;
-  createIsPointInOneFunction();
+  checkIfReady();
 };
 
+function checkIfReady() {
+  if (shoulder.loaded && one.loaded && gun.loaded) {
+    // Set one dimensions now that shoulder is loaded
+    one.height = shoulder.height * 0.3;
+    one.width = one.height / one.ratio;
+    one.targetX = canvas.width / 2 - one.width / 2;
+    one.targetY = canvas.height / 2 - one.height / 2;
+    one.x = one.targetX;
+    one.y = one.targetY;
+
+    // Create the mask function
+    createIsPointInOneFunction();
+  }
+}
+
 function createIsPointInOneFunction() {
+  // Validate that all required properties are set
+  if (!one.svg || one.width <= 0 || one.height <= 0) {
+    console.error("Cannot create mask: one object not properly initialized");
+    return;
+  }
+
   const oneCanvas = document.createElement("canvas");
   oneCanvas.width = canvas.width;
   oneCanvas.height = canvas.height;
   const oneCtx = oneCanvas.getContext("2d");
+
+  if (!oneCtx) {
+    console.error("Cannot get 2D context for mask");
+    return;
+  }
+
   oneCtx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Draw the one mask
@@ -152,6 +174,7 @@ gunSVG.onload = () => {
     x: gun.x,
     y: gun.y + gun.height,
   };
+  checkIfReady();
 };
 
 const points = [];
