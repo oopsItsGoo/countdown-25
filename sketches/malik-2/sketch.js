@@ -7,12 +7,14 @@ const { ctx, canvas } = renderer;
 // Load pickup and put sounds
 let pickupSound = null;
 let putSound = null;
-audio.load("/sketches/malik-2/paper.wav").then((sound) => {
-  pickupSound = sound;
-});
-audio.load("/sketches/malik-2/put.wav").then((sound) => {
-  putSound = sound;
-});
+pickupSound = await audio.load("/sketches/malik-2/paper.wav");
+// audio.load("/sketches/malik-2/paper.wav").then((sound) => {
+//   pickupSound = sound;
+// });
+putSound = await audio.load("/sketches/malik-2/put.wav");
+// audio.load("/sketches/malik-2/put.wav").then((sound) => {
+//   putSound = sound;
+// });
 
 let DEBUG = false;
 let stencilRatio = 0.5;
@@ -39,6 +41,8 @@ let outroProgress = 0;
 let outroStarted = false;
 let outroComplete = false;
 let backOutroOffset = 0; // Track how much the back has moved during outro
+let paperMovingOffScreen = false; // Track when paper should move directly off-screen
+let paperOffScreen = false; // Track when paper has moved completely off screen
 
 /* ------------------------------ load SVG --------------------------------*/
 const back = {
@@ -61,6 +65,8 @@ const paper = {
   targetX: 0,
   targetY: 0,
   isAnimating: false,
+  finalX: 0,
+  finalY: 0,
   rect: {
     x: 0,
     y: 0,
@@ -155,6 +161,8 @@ paperSVG.onload = () => {
   paper.targetY = canvas.height * 0.33;
   paper.originalX = paper.targetX;
   paper.originalY = paper.targetY;
+  paper.finalX = canvas.width + canvas.width * 0.5;
+  paper.finalY = paper.targetY;
   // Start off-screen at the bottom
   paper.x = paper.targetX;
   paper.y = canvas.height + paper.height;
@@ -260,7 +268,8 @@ function update(dt) {
       console.log("STATE TWO UPDATE");
 
       // Check if the two has been successfully placed
-      if (paper.hasReturned && two.onSkin) {
+      if (two.onSkin) {
+        paperMovingOffScreen = true;
         // Start waiting before outro
         if (!outroStarted) {
           outroWaitProgress += dt / waitBeforeOutro;
@@ -289,7 +298,9 @@ function update(dt) {
 
           // Calculate offset for designs on skin
           backOutroOffset = outroDistance * ease;
-          paper.x = paper.originalX + outroDistance * ease;
+          // Move paper to final position off-screen
+          const paperStartX = paper.originalX;
+          paper.x = paperStartX + (paper.finalX - paperStartX) * ease;
         }
 
         // Transition to finished after outro completes
@@ -321,7 +332,7 @@ function update(dt) {
       // Draw all previously placed failed attempts
       placedDesigns.firstDesign.forEach((design) => drawPlacedDesign(design));
       activeDesign = tattooDesign_01;
-      console.log("ACTIVE DESIGN FIRST:", activeDesign);
+      //console.log("ACTIVE DESIGN FIRST:", activeDesign);
       updateObject(tattooDesign_01);
       break;
     case State.SecondDesign:
@@ -427,21 +438,18 @@ function updatePaper() {
       paper.goToOriginal = false;
       // Play pickup sound
       if (pickupSound) {
-        pickupSound.play();
+        pickupSound.play({
+          volume: Math.random() * 0.1 + 0.9,
+        });
       }
     }
   } else if (paper.isDragging) {
     paper.isDragging = false;
     paper.goToOriginal = true;
 
-    // Play put sound when released
-    if (putSound) {
-      putSound.play();
-    }
-
     // Calculate and log the percentage of the design visible on the back
     const visiblePercentage = calculateVisiblePercentage(activeDesign);
-    console.log(`Visible percentage on back: ${visiblePercentage.toFixed(2)}%`);
+    //console.log(`Visible percentage on back: ${visiblePercentage.toFixed(2)}%`);
 
     if (visiblePercentage >= VISIBILITY_THRESHOLD) {
       // SUCCESS: The design is placed correctly
@@ -481,12 +489,27 @@ function updatePaper() {
       paper.goToOriginal = true;
       paper.hasReturned = false; // Ensure this doesn't trigger state change
     }
+
+    if (!activeDesign.onSkin) {
+      if (pickupSound) {
+        console.log("PLAY pickup SOUND");
+        pickupSound.play({
+          volume: Math.random() * 0.1 + 0.9,
+        });
+      }
+    } else {
+      if (putSound) {
+        putSound.play({
+          volume: Math.random() * 0.1 + 0.3,
+        });
+      }
+    }
   }
 
   if (paper.isDragging) {
     paper.x = input.getX();
     paper.y = input.getY();
-  } else if (paper.goToOriginal) {
+  } else if (paper.goToOriginal && !paperMovingOffScreen) {
     paper.x = math.lerp(paper.x, paper.originalX, 0.1);
     paper.y = math.lerp(paper.y, paper.originalY, 0.1);
 
@@ -504,9 +527,22 @@ function updatePaper() {
         paper.hasReturned = true;
       }
     }
+  } else if (paperMovingOffScreen) {
+    // Move paper directly to final position off-screen
+    const ease = 0.05;
+    paper.x += (paper.finalX - paper.x) * ease;
+    paper.y += (paper.finalY - paper.y) * ease;
+
+    // Check if paper has reached off-screen position
+    if (paper.x >= paper.finalX - 10) {
+      paperOffScreen = true;
+    }
   }
 
-  drawPaper();
+  // Only draw paper if it hasn't moved off screen
+  if (!paperOffScreen) {
+    drawPaper();
+  }
 }
 
 function paperIsHovered() {

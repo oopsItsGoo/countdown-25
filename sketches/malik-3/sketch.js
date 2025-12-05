@@ -37,8 +37,11 @@ const razor = {
   y: 0,
   targetX: 0,
   targetY: 0,
+  finalX: 0, // Final position off-screen
+  finalY: 0,
   width: 0,
   height: 0,
+  ratio: 0,
   isHovered: false,
   isDragging: false,
   showRazorRectDebug: false, //DEBUG
@@ -95,8 +98,9 @@ let razorLoaded = false;
 
 razorSVG.onload = () => {
   razorLoaded = true;
-  razor.width = razorSVG.naturalWidth;
-  razor.height = razorSVG.naturalHeight;
+  razor.ratio = razorSVG.naturalHeight / razorSVG.naturalWidth;
+  razor.height = canvas.height * 0.18;
+  razor.width = razor.height / razor.ratio;
   checkIfReady();
 };
 
@@ -270,6 +274,8 @@ function generateRandomHair(numOfHair) {
 function initRazor() {
   razor.targetX = canvas.width * 0.85;
   razor.targetY = canvas.height * 0.5;
+  razor.finalX = canvas.width + canvas.width * 0.5; // Final position off-screen to the right
+  razor.finalY = razor.targetY;
   // Start razor off-screen at the bottom
   razor.x = razor.targetX;
   razor.y = canvas.height + razor.height;
@@ -314,16 +320,16 @@ function update(dt) {
       }
       break;
     case State.Done:
-      // Check if razor has returned to target position
+      // Check if razor has reached final position (off-screen)
       const razorReturnDistance = math.dist(
         razor.x,
         razor.y,
-        razor.targetX,
-        razor.targetY
+        razor.finalX,
+        razor.finalY
       );
 
       if (razorReturnDistance < 5) {
-        // Razor is back at target, start waiting
+        // Razor is off-screen, start waiting
         if (!outroStarted) {
           outroWaitProgress += dt / outroWaitDuration;
 
@@ -449,11 +455,11 @@ function update(dt) {
   // Animate back to target when not dragging using smooth lerp
   if (!razor.isDragging) {
     if (currentState === State.Done) {
-      // Only return to target position when in Done state
+      // Move to final position (off-screen) when in Done state
       if (!outroStarted) {
         const returnEase = 0.03;
-        razor.x += (razor.targetX - razor.x) * returnEase;
-        razor.y += (razor.targetY - razor.y) * returnEase;
+        razor.x += (razor.finalX - razor.x) * returnEase;
+        razor.y += (razor.finalY - razor.y) * returnEase;
       }
     } else if (currentState === State.Intro) {
       // During intro, animate from bottom

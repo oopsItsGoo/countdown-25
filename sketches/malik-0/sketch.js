@@ -16,8 +16,8 @@ let currentState = State.WaitingForInput;
 const stars = [];
 const starCount = 5;
 const reviewSizeRatio = 0.15;
-const starY = canvas.height * 0.6; // Center vertical position
-const rateY = canvas.height * 0.69; // Center vertical position
+const starY = canvas.height * 0.5; // Center vertical position
+const rateY = canvas.height * 0.63; // Center vertical position
 let starsLoaded = 0;
 let rateButtonClicked = false;
 
@@ -65,6 +65,8 @@ const rate = {
   width: 0,
   height: 0,
   loaded: false,
+  shakeProgress: 0,
+  isShaking: false,
 };
 
 rateButtonSVG.onload = () => {
@@ -207,6 +209,11 @@ function drawReview() {
   ctx.restore();
 }
 
+function shakeRateButton() {
+  rate.isShaking = true;
+  rate.shakeProgress = 0;
+}
+
 function drawRate() {
   if (!rate.loaded) return;
   ctx.save();
@@ -214,10 +221,26 @@ function drawRate() {
   // Check if all stars are unclicked (button is clickable)
   const allStarsUnclicked = stars.every((star) => !star.clicked);
 
-  // Set opacity based on clickability
-  ctx.globalAlpha = allStarsUnclicked ? 1.0 : 0.8;
+  // Apply shake offset if shaking
+  let shakeOffsetX = 0;
+  let shakeOffsetY = 0;
+  if (rate.isShaking) {
+    const shakeIntensity = 5;
+    const frequency = 20;
+    const decay = Math.exp(-rate.shakeProgress * 8);
+    shakeOffsetX =
+      Math.sin(rate.shakeProgress * frequency) * shakeIntensity * decay;
+    shakeOffsetY =
+      Math.cos(rate.shakeProgress * frequency * 1.5) * shakeIntensity * decay;
+  }
 
-  ctx.drawImage(rate.svg, rate.x, rate.y, rate.width, rate.height);
+  ctx.drawImage(
+    rate.svg,
+    rate.x + shakeOffsetX,
+    rate.y + shakeOffsetY,
+    rate.width,
+    rate.height
+  );
   ctx.restore();
 }
 
@@ -264,15 +287,18 @@ function mouseClicked(event) {
     const allStarsUnclicked = stars.every((star) => !star.clicked);
 
     if (
-      allStarsUnclicked &&
       mouseX >= rate.x &&
       mouseX <= rate.x + rate.width &&
       mouseY >= rate.y &&
       mouseY <= rate.y + rate.height
     ) {
-      console.log("Rate button clicked!");
-      rateButtonClicked = true;
-      return; // Exit early to prevent star clicks
+      if (allStarsUnclicked) {
+        console.log("Rate button clicked!");
+        rateButtonClicked = true;
+        return; // Exit early to prevent star clicks
+      } else {
+        shakeRateButton();
+      }
     }
   }
 
@@ -328,6 +354,15 @@ function update(dt) {
     case State.Intro:
       break;
     case State.Reviewing:
+      // Update shake animation
+      if (rate.isShaking) {
+        rate.shakeProgress += dt * 2;
+        if (rate.shakeProgress >= 1) {
+          rate.isShaking = false;
+          rate.shakeProgress = 0;
+        }
+      }
+
       drawReview();
       // Draw all stars
       stars.forEach((star) => {

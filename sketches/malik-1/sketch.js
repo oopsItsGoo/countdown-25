@@ -125,8 +125,8 @@ const gun = {
   height: 0,
   targetX: 0,
   targetY: 0,
-  initialX: 0, // Store initial position
-  initialY: 0,
+  finalX: 0, // Store final position (off-screen)
+  finalY: 0,
   isAnimating: false,
   isPickedUp: false,
   isHovered: false,
@@ -143,8 +143,8 @@ gunSVG.onload = () => {
   gun.width = gun.height / gun.ratio;
   gun.targetX = canvas.width * 0.85 - gun.width / 2;
   gun.targetY = canvas.height * 0.33 - gun.height / 2;
-  gun.initialX = gun.targetX; // Save initial position
-  gun.initialY = gun.targetY;
+  gun.finalX = canvas.width + canvas.width * 0.5; // Final position off-screen to the right
+  gun.finalY = gun.targetY;
   // Start off-screen at the bottom
   gun.x = gun.targetX;
   gun.y = canvas.height + gun.height;
@@ -183,6 +183,9 @@ let slideOutDuration = 2.0; // Duration of slide-out animation
 let outroProgress = 0;
 let outroComplete = false;
 let coveragePercentage = 0;
+let fadeOutProgress = 0;
+let fadeOutDuration = 0.5;
+let isFadingOut = false;
 
 function update(dt) {
   // console.log(currentState);
@@ -194,7 +197,7 @@ function update(dt) {
   //drawObject(one);
   drawPoints();
   drawObject(gun);
-  DEBUGDrawGunRectangle();
+  //DEBUGDrawGunRectangle();
 
   let nextState = undefined;
 
@@ -278,27 +281,24 @@ function update(dt) {
       // Check if coverage threshold is reached
       if (coveragePercentage >= COVERAGE_THRESHOLD) {
         drawingDone = true;
+        isFadingOut = true;
+        fadeOutProgress = 0;
       }
       break;
     case State.Done:
-      // Smoothly return gun to initial position
-      gun.x = math.lerp(gun.x, gun.initialX, 0.05);
-      gun.y = math.lerp(gun.y, gun.initialY, 0.05);
+      // Smoothly move gun to final position (off-screen)
+      gun.x = math.lerp(gun.x, gun.finalX, 0.05);
+      gun.y = math.lerp(gun.y, gun.finalY, 0.05);
 
       // Update needle position
       gun.needlePosition.x = gun.x + gun.width / 2;
       gun.needlePosition.y = gun.y + gun.height;
 
-      // Check if gun has returned to initial position
-      const gunReturnDistance = math.dist(
-        gun.x,
-        gun.y,
-        gun.initialX,
-        gun.initialY
-      );
+      // Check if gun has reached final position
+      const gunReturnDistance = math.dist(gun.x, gun.y, gun.finalX, gun.finalY);
 
       if (gunReturnDistance < 5) {
-        // Gun is back at initial position, start waiting
+        // Gun is off-screen, start waiting
         if (!outroStarted) {
           outroWaitProgress += dt / waitBeforOutro;
 
@@ -328,13 +328,19 @@ function update(dt) {
 
         // Slide gun out to the right
         const gunTargetX = canvas.width + gun.width;
-        gun.x = gun.initialX + (gunTargetX - gun.initialX) * ease;
+        gun.x = gun.finalX + (gunTargetX - gun.finalX) * ease;
       }
       break;
     case State.Finished:
       console.log("FINISHED");
       finish();
       break;
+  }
+
+  // Update fade-out progress
+  if (isFadingOut && fadeOutProgress < 1) {
+    fadeOutProgress += dt / fadeOutDuration;
+    if (fadeOutProgress > 1) fadeOutProgress = 1;
   }
 
   let vol = 0;
@@ -344,6 +350,10 @@ function update(dt) {
     } else {
       vol = 0.3;
     }
+  } else if (isFadingOut) {
+    // Fade out over 0.5 seconds
+    const currentVol = input.isPressed() ? 1.0 : 0.3;
+    vol = currentVol * (1 - fadeOutProgress);
   }
   machineSoundInstance.setVolume(vol);
 }
@@ -379,7 +389,9 @@ function handleGunPickup() {
 
     // Play pickup sound and start machine sound
     if (pickupSound) {
-      pickupSound.play();
+      pickupSound.play({
+        volume: Math.random() * 0.1 + 0.9,
+      });
     }
   }
 }
