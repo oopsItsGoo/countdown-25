@@ -1,8 +1,18 @@
 import { createEngine } from "../_shared/engine.js";
 import { Spring } from "../_shared/spring.js";
 
-const { renderer, input, math, run, finish } = createEngine();
+const { renderer, input, math, audio, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
+
+// Load pickup and put sounds
+let pickupSound = null;
+let putSound = null;
+audio.load("/sketches/malik-2/paper.wav").then((sound) => {
+  pickupSound = sound;
+});
+audio.load("/sketches/malik-2/put.wav").then((sound) => {
+  putSound = sound;
+});
 
 let DEBUG = false;
 let stencilRatio = 0.5;
@@ -415,10 +425,19 @@ function updatePaper() {
     ) {
       paper.isDragging = true;
       paper.goToOriginal = false;
+      // Play pickup sound
+      if (pickupSound) {
+        pickupSound.play();
+      }
     }
   } else if (paper.isDragging) {
     paper.isDragging = false;
     paper.goToOriginal = true;
+
+    // Play put sound when released
+    if (putSound) {
+      putSound.play();
+    }
 
     // Calculate and log the percentage of the design visible on the back
     const visiblePercentage = calculateVisiblePercentage(activeDesign);
@@ -803,3 +822,9 @@ function DEBUG_BackRectangle() {
   ctx.strokeStyle = "blue";
   ctx.stroke();
 }
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "f") {
+    finish();
+  }
+});

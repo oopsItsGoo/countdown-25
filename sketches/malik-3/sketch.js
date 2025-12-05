@@ -1,7 +1,7 @@
 import { createEngine } from "../_shared/engine.js";
 import { createSpringSettings, Spring } from "../_shared/spring.js";
 
-const { renderer, input, math, run, finish } = createEngine();
+const { renderer, input, math, audio, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
 
 /* ------------- SETUP ------------- */
@@ -43,6 +43,21 @@ const razor = {
   isDragging: false,
   showRazorRectDebug: false, //DEBUG
 };
+
+// Load pickup sound
+let pickupSound = null;
+audio.load("/sketches/malik-3/pickup.wav").then((sound) => {
+  pickupSound = sound;
+});
+
+// Load shave sound
+let shaveSound = null;
+let lastShaveSoundTime = 0;
+const shaveSoundCooldown = 0.1; // Minimum time between sound plays
+
+audio.load("/sketches/malik-3/shave.wav").then((sound) => {
+  shaveSound = sound;
+});
 
 // Intro animation
 let introProgress = 0;
@@ -402,6 +417,11 @@ function update(dt) {
       razor.isDragging = true;
       razor.offsetX = razor.x - mouseX;
       razor.offsetY = razor.y - mouseY;
+      // Play pickup sound
+      if (pickupSound) {
+        console.log("PLAY SOUND");
+        pickupSound.play();
+      }
     }
     if (razor.isDragging) {
       // Smooth lerp towards mouse position while dragging
@@ -470,6 +490,37 @@ function update(dt) {
           // Decrease counter if hair was in mask
           if (e.isInMask) {
             shavedHairsInMaskCount++;
+          }
+
+          // Play shave sound only if not already playing
+          if (shaveSound && !shaveSound.isPlaying()) {
+            const soundInstance = shaveSound.play({ volume: 1.0 });
+            // Schedule fade out before sound ends (last 0.3 seconds)
+            if (soundInstance && shaveSound.buffer) {
+              const fadeOutDuration = 0.3;
+              const fadeOutStartTime =
+                shaveSound.buffer.duration - fadeOutDuration;
+              setTimeout(() => {
+                if (soundInstance && soundInstance.setVolume) {
+                  // Exponential fade from 1.0 to 0.01 over fadeOutDuration
+                  const steps = 30;
+                  const stepTime = (fadeOutDuration * 1000) / steps;
+                  let currentStep = 0;
+                  const fadeInterval = setInterval(() => {
+                    currentStep++;
+                    const progress = currentStep / steps;
+                    const volume = Math.max(
+                      0.01,
+                      1.0 * Math.pow(0.01, progress)
+                    );
+                    soundInstance.setVolume(volume);
+                    if (currentStep >= steps) {
+                      clearInterval(fadeInterval);
+                    }
+                  }, stepTime);
+                }
+              }, fadeOutStartTime * 1000);
+            }
           }
         }
       }
@@ -571,3 +622,9 @@ function drawThreeMaskDebug() {
   );
   ctx.restore();
 }
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "f") {
+    finish();
+  }
+});

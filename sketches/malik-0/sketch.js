@@ -355,3 +355,9 @@ function update(dt) {
       break;
   }
 }
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "f") {
+    finish();
+  }
+});

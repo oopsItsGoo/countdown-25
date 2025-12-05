@@ -1,8 +1,20 @@
 import { createEngine } from "../_shared/engine.js";
 import { Spring } from "../_shared/spring.js";
 
-const { renderer, input, math, run, finish } = createEngine();
+const { renderer, input, math, audio, run, finish } = createEngine();
 const { ctx, canvas } = renderer;
+
+// Load audio files
+let machineSound = null;
+let machineSoundInstance = null;
+let pickupSound = null;
+audio.load("/sketches/malik-1/machine.wav", { loop: true }).then((sound) => {
+  machineSound = sound;
+});
+audio.load("/sketches/malik-1/pickup.wav").then((sound) => {
+  pickupSound = sound;
+});
+
 run(update);
 
 let slideInDuration = 2.0; // Duration of slide-in animations in seconds
@@ -248,6 +260,15 @@ function update(dt) {
       if (gun.isPickedUp) {
         updateGun();
 
+        // Update machine sound volume based on mouse press
+        if (machineSoundInstance) {
+          if (input.isPressed()) {
+            machineSoundInstance.setVolume(1.0);
+          } else {
+            machineSoundInstance.setVolume(0.3);
+          }
+        }
+
         // Only add points when clicking/holding after pickup
         if (input.isPressed() && lastPointTime >= pointInterval) {
           addPointAtNeedle();
@@ -261,6 +282,10 @@ function update(dt) {
       // Check if coverage threshold is reached
       if (coveragePercentage >= COVERAGE_THRESHOLD) {
         drawingDone = true;
+        // Stop machine sound when drawing is complete
+        if (machineSoundInstance) {
+          machineSoundInstance.setVolume(0);
+        }
       }
       break;
     case State.Done:
@@ -349,6 +374,14 @@ function handleGunPickup() {
     // Store offset from mouse to gun position
     gun.offsetX = gun.width / 4;
     gun.offsetY = (3 * gun.height) / 4;
+
+    // Play pickup sound and start machine sound
+    if (pickupSound) {
+      pickupSound.play();
+    }
+    if (machineSound && !machineSoundInstance) {
+      machineSoundInstance = machineSound.play({ volume: 0.3 });
+    }
   }
 }
 
@@ -476,3 +509,9 @@ function DEBUGDrawGunRectangle() {
   ctx.strokeRect(gun.x, gun.y, gun.width, gun.height);
   ctx.restore();
 }
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "f") {
+    finish();
+  }
+});
