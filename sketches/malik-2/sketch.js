@@ -165,7 +165,7 @@ paperSVG.onload = () => {
   paper.finalY = paper.targetY;
   // Start off-screen at the bottom
   paper.x = paper.targetX;
-  paper.y = canvas.height + paper.height;
+  paper.y = canvas.height + 2 * paper.height;
   paper.goToOriginal = false;
   paper.rect = {
     x: paper.x - paper.width / 2,

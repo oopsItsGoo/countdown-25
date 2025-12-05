@@ -37,6 +37,16 @@ const rateY = canvas.height * 0.63; // Center vertical position
 let starsLoaded = 0;
 let rateButtonClicked = false;
 
+let introDuration = 0.2;
+let introProgress = 0;
+let introComplete = false;
+
+//outro
+let outroComplete = false;
+let outroDuration = 0.2;
+let outroProgress = 0;
+let goBlack = false;
+
 const reviewSVG = new Image();
 reviewSVG.src = "/sketches/malik-0/review-02.svg";
 const review = {
@@ -127,6 +137,7 @@ const zeroSpring = new Spring({
   target: 1,
 });
 let zeroSpringStarted = false;
+let zeroSpringFinished = false;
 
 zeroSVG.onload = () => {
   zero.loaded = true;
@@ -299,52 +310,58 @@ function mouseClicked(event) {
   const mouseX = input.getX();
   const mouseY = input.getY();
 
-  // Check rate button click first
-  if (rate.loaded) {
-    const allStarsUnclicked = stars.every((star) => !star.clicked);
-
-    if (
-      mouseX >= rate.x &&
-      mouseX <= rate.x + rate.width &&
-      mouseY >= rate.y &&
-      mouseY <= rate.y + rate.height
-    ) {
-      if (allStarsUnclicked) {
-        console.log("Rate button clicked!");
-        rateButtonClicked = true;
-        buttonSuccess.play();
-        return; // Exit early to prevent star clicks
-      } else {
-        shakeRateButton();
-      }
-    }
-  }
-
-  // Check star clicks
-  stars.forEach((star) => {
-    const halfWidth = star.width / 2;
-    const halfHeight = star.height / 2;
-
-    if (
-      mouseX >= star.x - halfWidth &&
-      mouseX <= star.x + halfWidth &&
-      mouseY >= star.y - halfHeight &&
-      mouseY <= star.y + halfHeight
-    ) {
-      console.log("Star clicked!", star);
-      star.clicked = !star.clicked; // Toggle the clicked state
+  if (currentState == State.Reviewing) {
+    // Check rate button click first
+    if (rate.loaded && !rateButtonClicked) {
       const allStarsUnclicked = stars.every((star) => !star.clicked);
-      if (allStarsUnclicked) {
-        starsSuccess.play();
-      } else {
-        if (!star.clicked) {
-          starPositive.play();
+
+      if (
+        mouseX >= rate.x &&
+        mouseX <= rate.x + rate.width &&
+        mouseY >= rate.y &&
+        mouseY <= rate.y + rate.height
+      ) {
+        if (allStarsUnclicked) {
+          console.log("Rate button clicked!");
+          rateButtonClicked = true;
+          buttonSuccess.play();
+          return; // Exit early to prevent star clicks
         } else {
-          starNegative.play();
+          shakeRateButton();
         }
       }
     }
-  });
+
+    // Check star clicks
+    stars.forEach((star) => {
+      const halfWidth = star.width / 2;
+      const halfHeight = star.height / 2;
+
+      if (
+        mouseX >= star.x - halfWidth &&
+        mouseX <= star.x + halfWidth &&
+        mouseY >= star.y - halfHeight &&
+        mouseY <= star.y + halfHeight
+      ) {
+        console.log("Star clicked!", star);
+        star.clicked = !star.clicked; // Toggle the clicked state
+        const allStarsUnclicked = stars.every((star) => !star.clicked);
+        if (allStarsUnclicked) {
+          starsSuccess.play();
+        } else {
+          if (!star.clicked) {
+            starPositive.play();
+          } else {
+            starNegative.play();
+          }
+        }
+      }
+    });
+  } else if (currentState == State.Outro) {
+    if (zeroSpringFinished) {
+      goBlack = true;
+    }
+  }
 }
 // Register click handler once
 window.addEventListener("click", mouseClicked);
@@ -355,7 +372,9 @@ function update(dt) {
       nextState = State.Intro;
       break;
     case State.Intro:
-      nextState = State.Reviewing;
+      if (introComplete) {
+        nextState = State.Reviewing;
+      }
       break;
     case State.Reviewing:
       if (rateButtonClicked) {
@@ -363,7 +382,9 @@ function update(dt) {
       }
       break;
     case State.Outro:
-      //nextState = State.Finished;
+      if (outroComplete) {
+        nextState = State.Finished;
+      }
       break;
     case State.Finished:
       break;
@@ -380,6 +401,33 @@ function update(dt) {
       }
       break;
     case State.Intro:
+      // Update intro animation progress
+      if (!introComplete) {
+        introProgress += dt / introDuration;
+        if (introProgress >= 1) {
+          introProgress = 1;
+          introComplete = true;
+        }
+      }
+
+      // Easing function (smoothstep)
+      const ease = introProgress * introProgress * (3 - 2 * introProgress);
+      const canvasScale = ease; // Scale from 0 to 1
+
+      // Save context and apply scale transformation
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(canvasScale, canvasScale);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+      // Draw all objects
+      drawReview();
+      stars.forEach((star) => {
+        drawStar(star);
+      });
+      drawRate();
+
+      ctx.restore();
       break;
     case State.Reviewing:
       // Update shake animation
@@ -399,19 +447,57 @@ function update(dt) {
       drawRate();
       break;
     case State.Outro:
-      // Initialize spring on first frame of outro
-      if (!zeroSpringStarted) {
-        zeroSpringStarted = true;
-        zeroSpring.position = 0.1; // Start very small
-        zeroSpring.velocity = 0;
-        zeroSpring.target = 1; // Target normal scale
+      if (!goBlack) {
+        // Initialize spring on first frame of outro
+        if (!zeroSpringStarted) {
+          zeroSpringStarted = true;
+          zeroSpring.position = 0.1; // Start very small
+          zeroSpring.velocity = 0;
+          zeroSpring.target = 1; // Target normal scale
+        }
+
+        // Step the spring animation
+        zeroSpring.step(dt);
+
+        // Check if spring animation is finished (close to target and low velocity)
+        if (
+          !zeroSpringFinished &&
+          Math.abs(zeroSpring.position - 1) < 0.01 &&
+          Math.abs(zeroSpring.velocity) < 0.01
+        ) {
+          zeroSpringFinished = true;
+          console.log("Zero spring animation finished.");
+        }
+
+        drawZero();
+        drawFife();
+      } else {
+        // Update outro animation progress when goBlack is true
+        if (!outroComplete) {
+          outroProgress += dt / outroDuration;
+          if (outroProgress >= 1) {
+            outroProgress = 1;
+            outroComplete = true;
+          }
+        }
+
+        // Easing function (smoothstep)
+        const outroEase =
+          outroProgress * outroProgress * (3 - 2 * outroProgress);
+        const outroCanvasScale = 1 - outroEase; // Scale from 1 to 0 (inverse)
+
+        // Save context and apply scale transformation
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(outroCanvasScale, outroCanvasScale);
+        ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+        // Draw zero and fife while shrinking
+        drawZero();
+        drawFife();
+
+        ctx.restore();
       }
-
-      // Step the spring animation
-      zeroSpring.step(dt);
-
-      drawZero();
-      drawFife();
       break;
     case State.Finished:
       finish();
